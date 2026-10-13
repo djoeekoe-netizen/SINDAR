@@ -1,13 +1,32 @@
-node_modules
-.DS_Store
-dist
-dist-ssr
-*.local
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+out/
+.output/
+*.tsbuildinfo
+
+# Environment & secrets
 .env
-.nitro
-.tanstack
-.wrangler
-.output
-.vinxi
-__unconfig*
-todos.json
+.env.*
+!.env.example
+*.local
+
+# Runtime data (sessions, memory, logs) — never commit user data
+data/
+*.sqlite
+*.sqlite-*
+*.db
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
