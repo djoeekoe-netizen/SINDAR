@@ -6,6 +6,8 @@
   },
   "ignorePatterns": ["dist", "node_modules"],
   "rules": {
-    "no-underscore-dangle": "off"
+    "no-underscore-dangle": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "no-unmodified-loop-condition": "off"
   }
 }

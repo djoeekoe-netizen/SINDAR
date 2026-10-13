@@ -39,6 +39,38 @@ export const ConfigSchema = z.object({
       /** Defaults to `<home>/workspace` when omitted. */
       workspace: z.string().optional(),
       maxIterations: z.number().int().positive().max(500).default(50),
+      /** Tool groups exposed to the model. */
+      toolsets: z.array(z.string()).default(['files', 'terminal', 'web']),
+      /** Programs that may run without approval in `allowlist` mode (first word of the command). */
+      allowlist: z
+        .array(z.string())
+        .default([
+          'ls',
+          'cat',
+          'head',
+          'tail',
+          'wc',
+          'pwd',
+          'echo',
+          'grep',
+          'rg',
+          'find',
+          'git',
+          'node',
+          'npm',
+          'pnpm',
+          'python3',
+          'python',
+          'date',
+          'uname',
+          'which',
+        ]),
+      /** Context window override when the model is unknown (tokens). */
+      contextWindow: z.number().int().positive().optional(),
+      /** Tool output beyond this is truncated (full output saved to a file). */
+      maxToolOutputChars: z.number().int().positive().default(16_000),
+      toolTimeoutS: z.number().int().positive().max(3600).default(120),
+      temperature: z.number().min(0).max(2).optional(),
     })
     .prefault({}),
   gateway: z

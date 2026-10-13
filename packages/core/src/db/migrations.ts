@@ -148,7 +148,18 @@ export function ftsKind(db: Db): FtsKind {
   }
 }
 
-export const MIGRATIONS: Migration[] = [init];
+/** Schema v2 — multi-part message payloads + compression bookkeeping. */
+const v2: Migration = {
+  id: 2,
+  name: 'parts-and-summary',
+  up: (db) => {
+    db.exec(`ALTER TABLE messages ADD COLUMN parts TEXT;`);
+    db.exec(`ALTER TABLE sessions ADD COLUMN summary_upto INTEGER NOT NULL DEFAULT 0;`);
+    db.exec(`ALTER TABLE sessions ADD COLUMN approval_mode TEXT;`);
+  },
+};
+
+export const MIGRATIONS: Migration[] = [init, v2];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.id ?? 0;
 

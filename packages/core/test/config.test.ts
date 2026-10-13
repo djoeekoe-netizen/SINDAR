@@ -76,3 +76,41 @@ describe('config', () => {
     expect(loaded.paths.home).toBe(path.resolve(home));
   });
 });
+
+describe('config editing', () => {
+  it('sets values preserving comments, validates, and upserts env vars', async () => {
+    const { coerceValue, setConfigValue, upsertEnvVar, readEnvFile, getConfigValue } =
+      await import('../src/config/edit.js');
+    const file = path.join(home, 'config.yaml');
+    fs.writeFileSync(file, '# keep me\nmodel:\n  default: mock:echo # inline\n');
+    setConfigValue(file, 'model.default', 'groq:llama-3.3-70b-versatile');
+    setConfigValue(file, 'model.fallbacks', ['gemini:gemini-2.5-flash']);
+    setConfigValue(file, 'agent.approvalMode', 'yolo');
+    const text = fs.readFileSync(file, 'utf8');
+    expect(text).toContain('# keep me');
+    expect(text).toContain('# inline');
+    expect(text).toContain('default: groq:llama-3.3-70b-versatile');
+    expect(text).toContain('fallbacks: [ gemini:gemini-2.5-flash ]');
+    expect(() => setConfigValue(file, 'agent.approvalMode', 'maybe')).toThrowError(ConfigError);
+    expect(fs.readFileSync(file, 'utf8')).toContain('approvalMode: yolo');
+    expect(coerceValue('123')).toBe(123);
+    expect(coerceValue('true')).toBe(true);
+    expect(coerceValue('[a, b]')).toEqual(['a', 'b']);
+    expect(coerceValue('groq:llama')).toBe('groq:llama');
+    expect(getConfigValue({ a: { b: 1 } }, 'a.b')).toBe(1);
+
+    const env = path.join(home, '.env');
+    fs.writeFileSync(env, '# keys\nGROQ_API_KEY=old\nOTHER=1\n');
+    upsertEnvVar(env, 'GROQ_API_KEY', 'new-key');
+    upsertEnvVar(env, 'GEMINI_API_KEY', 'with space');
+    expect(readEnvFile(env)).toEqual({
+      GROQ_API_KEY: 'new-key',
+      OTHER: '1',
+      GEMINI_API_KEY: 'with space',
+    });
+    expect(fs.readFileSync(env, 'utf8')).toContain('# keys');
+    if (process.platform !== 'win32') expect(fs.statSync(env).mode & 0o777).toBe(0o600);
+    upsertEnvVar(env, 'OTHER', undefined);
+    expect(readEnvFile(env).OTHER).toBeUndefined();
+  });
+});

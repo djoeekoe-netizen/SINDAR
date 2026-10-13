@@ -440,17 +440,17 @@ Discord / WhatsApp (Baileys، مع تحذير) / Slack في M7 بنفس الوا
 - **اكتشافات أثناء التنفيذ:** (1) esbuild يحذف بادئة `node:` فيكسر `node:sqlite` — حُلّ بمُعرِّف غير حرفي. (2) `sql.js` لا يحوي FTS5 بل FTS4 فقط — المخطط صار تكيفياً (FTS5 → FTS4 → بلا) ويُسجَّل النوع في جدول `meta`. (3) المستودع **خاص** — التنزيل المجهول للحزمة يتطلب جعله عاماً.
 - **قبول:** ✔ `pnpm i && pnpm build && pnpm test` أخضر محلياً وفي CI (Linux + Windows)؛ ✔ **تم التحقق على جوال المستخدم (2026-10-14)**: تثبيت بأمر واحد في Termux ثم `sindar doctor` → Android/Termux · arm64 · `node:sqlite` + FTS5 · 7.4 GB RAM · Termux:API مثبت · «جاهز مع تنبيهين» (النموذج التجريبي + لا مفتاح بعد — وهما المطلوبان في M1).
 
-### M1 — النواة + CLI chat
-- [ ] مزود `openai-compat` (بث SSE، أدوات، usage) + مزود `anthropic`.
-- [ ] Agent Loop كامل (§9) + Context Builder (SOUL/USER/MEMORY/AGENTS.md) + ضغط السياق.
-- [ ] سجلّ الأدوات (zod → JSON Schema) + toolsets `files`, `terminal` (local backend)، `web`.
-- [ ] محرك سياسات أولي: `ask`/`allowlist`/`yolo` + approval floors + حراسة مسارات.
-- [ ] الجلسات في SQLite (إنشاء/استئناف/قائمة) + تسجيل usage.
-- [ ] `sindar chat`: بث للطرفية، عرض استدعاءات الأدوات، موافقة تفاعلية، `Ctrl+C` للمقاطعة، أوامر `/new /model /usage /retry /undo /compress /help`.
-- [ ] `sindar model` (اختيار مزود/نموذج تفاعلي) و `sindar config get|set`.
-- [ ] اختبارات: الحلقة بالـ mock (أدوات متسلسلة، رفض موافقة، ضغط)، الأدوات (ملفات/طرفية)، السياسات.
-- [ ] توافق Termux مُختبر: `terminal` يستخدم صدَفة Termux، الملفات في `~/storage/shared` بعد `termux-setup-storage`، `sindar onboard` يقترح مزوداً مجانياً (Groq/Gemini/OpenRouter) ويختبر المفتاح.
-- **قبول:** **على جوالك داخل Termux**: `sindar chat` مع مفتاح Groq المجاني (أو Gemini) → «اقرأ ملفات هذا المجلد ولخّصها ثم أنشئ ملف NOTES.md» → ينفّذ بالأدوات، يطلب موافقة، والجلسة تُستأنف بعد إعادة التشغيل.
+### M1 — النواة + CLI chat ✅ (منجز — بانتظار اختبار الجوال)
+- [x] مزود `openai-compat` (بث SSE، أدوات، usage، إعادة المحاولة بلا `stream_options`، تصنيف الأخطاء auth/rate_limit/network/server) + مزود `anthropic` (Messages API مع tool_use/tool_result والبث).
+- [x] Agent Loop كامل (§9): بث الأحداث، تنفيذ الأدوات تسلسلياً، احتياط تلقائي للنموذج التالي عند الأخطاء القابلة للإعادة، إيقاف بـ Ctrl+C مع حفظ الجزء المكتوب، حد أقصى للدورات.
+- [x] Context Builder: SOUL/USER/MEMORY.md (تُنشأ تلقائياً) + AGENTS.md من مجلد العمل وما فوقه + بيئة (التاريخ، المنصة، Termux، مساحة العمل) + تعليمات الأدوات. ضغط السياق عند 75% من النافذة إلى `sessions.summary` (تقدير رموز متحفّظ للعربية).
+- [x] سجلّ الأدوات (zod → JSON Schema عبر `z.toJSONSchema`) + toolsets `files` (read/write/edit/list/search مع ripgrep إن وُجد)، `terminal` (مهلة، خلفية + `process`)، `web` (fetch→نص، بحث DuckDuckGo بلا مفتاح، حجب العناوين الخاصة).
+- [x] محرك سياسات: `ask`/`allowlist`/`yolo` + أرضيات صلبة (rm -rf /، mkfs، dd، fork bomb، لمس `.env`/قاعدة البيانات/مفاتيح SSH) + «موافقة دائمة لهذه الأداة في الجلسة» + تسجيل كل قرار في `approvals`.
+- [x] الجلسات في SQLite (إنشاء/استئناف `-c`/`-r <id>`/قائمة/حذف/undo) + تسجيل usage لكل نموذج. ترحيل v2 (`messages.parts`, `sessions.summary_upto`, `sessions.approval_mode`).
+- [x] `sindar chat`: تفاعلي (readline يعمل في Termux) أو بسطر واحد أو من stdin؛ بث للطرفية، سطور حالة للأدوات، موافقة تفاعلية `y/n/a`، أوامر `/new /model /approve /usage /retry /undo /compress /sessions /help /exit`.
+- [x] `sindar onboard` (معالج: لغة ← مزود مجاني أولاً ← مفتاح مخفي + اختبار ← قائمة نماذج حقيقية ← وضع الموافقة ← اختبار سريع؛ يعمل أيضاً بلا تفاعل بالخيارات) و`sindar model [ref] [--list] [--fallbacks]` و`sindar config get|set|path` (يحافظ على التعليقات في YAML ويتحقق بالمخطط) و`sindar sessions`.
+- [x] اختبارات: 66 اختباراً (الحلقة بالـ mock: أدوات متسلسلة، رفض/موافقة دائمة، ممنوعات في yolo، احتياط النماذج، إلغاء، حد الدورات، ضغط؛ الأدوات؛ السياسات؛ مزودا HTTP بخادم SSE وهمي؛ تحرير الإعدادات؛ CLI من الحزمة المبنية).
+- [ ] **قبول (على جوالك)**: `sindar onboard` بمفتاح Groq المجاني ثم `sindar chat` → «اقرأ ملفات هذا المجلد ولخّصها ثم أنشئ ملف NOTES.md» ← أدوات + موافقة + استئناف الجلسة بـ `sindar chat -c`.
 
 ### M2 — Gateway + واجهة الويب
 - [ ] Hono: مسارات §12 + WS + توكن + تقديم SPA + `/health`.

@@ -18,7 +18,7 @@
 curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
 ```
 
-ثم: `sindar doctor` — الدليل المصوّر خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.
+ثم: `sindar onboard` (اختيار نموذج مجاني ولصق المفتاح) ← `sindar chat`. الدليل خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.
 على الكمبيوتر يكفي Node.js ≥ 22.13 ثم نفس السطر (بدون `pkg install`).
 
 ## 🚧 الحالة
@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3
 | المرحلة | الناتج | الحالة |
 |---|---|---|
 | **M0** | الهيكل والأساس (monorepo، config، DB، mock provider، CI، سكربت تثبيت Termux، `sindar doctor`) | ✅ |
-| **M1** | النواة + CLI — محادثة بالأدوات من الطرفية (على الجوال في Termux أو على الكمبيوتر) | ⬜ التالي |
+| **M1** | النواة + CLI — `sindar onboard` و`sindar chat` بالأدوات (ملفات، طرفية، ويب) مع موافقات | ✅ (قيد الاختبار على الجوال) |
 | **M2** | Gateway + واجهة ويب/PWA عربية/إنجليزية — تُستخدم كتطبيق من الشاشة الرئيسية | ⬜ |
 | **M3** | حلقة التعلّم — ذاكرة، بحث جلسات، مهارات ذاتية | ⬜ |
 | **M4** | قناة Telegram | ⬜ |

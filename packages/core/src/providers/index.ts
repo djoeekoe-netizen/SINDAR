@@ -3,3 +3,7 @@ export * from './model-ref.js';
 export * from './templates.js';
 export * from './resolve.js';
 export * from './mock.js';
+export * from './http.js';
+export * from './openai-compat.js';
+export * from './anthropic.js';
+export * from './registry.js';

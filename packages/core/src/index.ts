@@ -8,3 +8,6 @@ export * from './db/index.js';
 export * from './providers/index.js';
 export * from './i18n/index.js';
 export * from './doctor/index.js';
+export * from './tools/index.js';
+export * from './policy/index.js';
+export * from './agent/index.js';

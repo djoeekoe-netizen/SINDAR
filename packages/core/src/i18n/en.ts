@@ -16,7 +16,7 @@ export const en: Record<keyof typeof ar, string> = {
   'doctor.config.fail': 'Invalid configuration: {error}',
   'doctor.config.warn': 'Config warning: {warning}',
   'doctor.model.mock':
-    'Default model is the test mock — `sindar onboard` (next milestone) will set a real one',
+    'Default model is the test mock — run `sindar onboard` to pick a real (free) model',
   'doctor.db.ok': 'Database: {driver} · SQLite {sqlite} · full-text {fts} · schema v{schema}',
   'doctor.db.fts.missing': 'No full-text engine (FTS) — search will run in simple mode',
   'doctor.db.fallback': 'node:sqlite missing in this Node build — switched to sql.js automatically',
@@ -51,5 +51,101 @@ export const en: Record<keyof typeof ar, string> = {
   'update.done': 'Updated. Run: sindar doctor',
   'update.fail': 'Update failed: {error}',
   'update.npm.missing': 'npm not found on PATH',
-  'cli.hint': 'Try: sindar doctor',
+  'cli.hint':
+    'Start with: sindar onboard (setup), then sindar chat · sindar doctor for a health check',
+
+  // ---- chat ----
+  'chat.session.new': 'New session {id} · model: {model}',
+  'chat.session.resumed': 'Resumed session {id} ({count} messages) · model: {model}',
+  'chat.hint':
+    'Type a message and press Enter · /help for commands · Ctrl+C stops the reply or exits',
+  'chat.thinking': 'thinking…',
+  'chat.tool.run': '⚙ {summary}',
+  'chat.tool.done': '✓ {name} ({ms}ms)',
+  'chat.tool.error': '✖ {name}: {error}',
+  'chat.tool.denied': '⛔ denied: {summary} ({reason})',
+  'chat.tool.forbidden': 'blocked by safety rules',
+  'chat.approve.title': 'SINDAR asks for permission:',
+  'chat.approve.reason.exec': 'run a terminal command',
+  'chat.approve.reason.write-outside': 'write a file outside the workspace',
+  'chat.approve.reason.pipe-to-shell': 'download and run a script from the internet',
+  'chat.approve.prompt': 'Allow? [y] yes  [n] no  [a] always for this tool in this session: ',
+  'chat.cancelled': '⏹ stopped',
+  'chat.model.switch': '↪ switched from {from} to {to}: {reason}',
+  'chat.compress': '🗜 context compressed ({before} → {after} est. tokens)',
+  'chat.usage': 'Usage: {in} in · {out} out · {calls} calls',
+  'chat.usage.none': 'No usage recorded yet',
+  'chat.bye': 'Bye 👋',
+  'chat.error': 'Error: {error}',
+  'chat.error.nokey': 'No API key for the model provider. Run: sindar onboard',
+  'chat.undo.ok': '↶ removed your last message and its reply',
+  'chat.undo.none': 'Nothing to undo',
+  'chat.model.set': 'Model for this session: {model}',
+  'chat.approval.set': 'Approval mode: {mode}',
+  'chat.help': `Commands:
+  /new            start a new session
+  /model [ref]    show/change the model (e.g. groq:llama-3.3-70b-versatile)
+  /approve <mode> ask | allowlist | yolo
+  /usage          tokens used in this session
+  /retry          resend your last message
+  /undo           remove your last message and its reply
+  /compress       summarize older conversation now
+  /sessions       recent sessions (resume with: sindar chat -r <id>)
+  /exit           quit`,
+  'chat.oneshot.empty': 'No message given. Example: sindar chat "hello"',
+  'chat.compress.done': 'compressed',
+  'chat.compress.skip': 'conversation is short — nothing to compress',
+  'chat.retry.none': 'No message to resend',
+
+  // ---- onboard ----
+  'onboard.title': 'SINDAR setup — a few free steps',
+  'onboard.lang': 'Language / اللغة: [1] العربية  [2] English',
+  'onboard.provider.title': 'Pick a model provider (all free or with a free tier):',
+  'onboard.provider.local': 'local on your device',
+  'onboard.provider.free': 'free tier',
+  'onboard.provider.paid': 'paid',
+  'onboard.provider.recommended': 'recommended',
+  'onboard.provider.prompt': 'Number [{default}]: ',
+  'onboard.key.url': 'Get a free key at: {url}',
+  'onboard.key.prompt': 'Paste the key ({env}) and press Enter: ',
+  'onboard.key.existing': 'A key is already saved ({masked}) — press Enter to keep it',
+  'onboard.key.testing': 'Testing the key…',
+  'onboard.key.ok': 'Key works ✓ ({ms}ms)',
+  'onboard.key.fail': 'Test failed: {error}',
+  'onboard.key.retry': 'Try again? [Y/n]: ',
+  'onboard.key.saved': 'Key saved to {file} (mode 600)',
+  'onboard.local.unreachable': 'Local server not reachable at {url} — start it and retry',
+  'onboard.model.title': 'Pick a model:',
+  'onboard.model.prompt': 'Number or type a model name [{default}]: ',
+  'onboard.model.fetching': 'Fetching model list…',
+  'onboard.saved': 'Saved: default model {model}',
+  'onboard.test': 'Quick test…',
+  'onboard.test.reply': 'Reply: {text}',
+  'onboard.done': 'Ready! Start chatting with: sindar chat',
+  'onboard.approval.title':
+    'Command approval mode: [1] always ask (safe)  [2] allowlist  [3] run without asking',
+  'onboard.aborted': 'Setup cancelled',
+
+  // ---- model / config / sessions ----
+  'model.current': 'Default model: {model}',
+  'model.fallbacks': 'Fallbacks: {list}',
+  'model.none': 'none',
+  'model.providers': 'Providers:',
+  'model.ready': 'ready',
+  'model.nokey': 'no key ({env})',
+  'model.set': 'Default model set to {model}',
+  'model.warn.unconfigured': 'Warning: provider {provider} has no key yet — run sindar onboard',
+  'model.listing': 'Models for {provider}:',
+  'config.saved': 'Saved: {key} = {value}',
+  'config.invalid': 'Invalid value: {error}',
+  'config.path': 'Config file: {path}',
+  'config.unknown': 'No such key: {key}',
+  'sessions.title': 'Recent sessions:',
+  'sessions.none': 'No sessions yet',
+  'sessions.row': '{id}  {when}  {count} msgs  {model}  {title}',
+  'sessions.notfound': 'No session with id: {id}',
+  'sessions.deleted': 'Deleted session {id}',
+  'common.yes': 'yes',
+  'common.no': 'no',
+  'common.cancelled': 'cancelled',
 };

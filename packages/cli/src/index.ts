@@ -7,7 +7,12 @@ process.on('warning', (w) => {
 
 import { Command } from 'commander';
 import { VERSION, BUILD, t, isLang } from '@sindar/core';
+import { registerChat } from './commands/chat.js';
+import { registerConfig } from './commands/config.js';
 import { registerDoctor } from './commands/doctor.js';
+import { registerModel } from './commands/model.js';
+import { registerOnboard } from './commands/onboard.js';
+import { registerSessions } from './commands/sessions.js';
 import { registerUpdate } from './commands/update.js';
 import { banner } from './render.js';
 
@@ -26,6 +31,11 @@ program
     process.stdout.write(banner(VERSION) + '\n\n' + t(lang, 'cli.hint') + '\n');
   });
 
+registerChat(program);
+registerOnboard(program);
+registerModel(program);
+registerSessions(program);
+registerConfig(program);
 registerDoctor(program);
 registerUpdate(program);
 
