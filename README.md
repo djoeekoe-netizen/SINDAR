@@ -15,7 +15,7 @@
 ## 📲 التثبيت (جوال Android عبر Termux، أو Linux/macOS)
 
 ```bash
-pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
 ```
 
 ثم: `sindar doctor` — الدليل المصوّر خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.

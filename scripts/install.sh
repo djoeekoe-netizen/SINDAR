@@ -49,11 +49,24 @@ echo
 # ---------------------------------------------------------------- Termux prep
 if is_termux; then
   say "Termux detected — تم اكتشاف Termux"
-  say "Updating packages and installing Node.js LTS (قد يستغرق دقائق)…"
-  pkg update -y -o Dpkg::Options::="--force-confnew" >/dev/null 2>&1 || warn "pkg update failed — continuing"
-  pkg install -y nodejs-lts git >/dev/null 2>&1 || pkg install -y nodejs-lts git
+  export DEBIAN_FRONTEND=noninteractive
+  APT_OPTS=(-y -o Dpkg::Options::=--force-confnew -o Dpkg::Options::=--force-confdef)
+  # A *full* upgrade is mandatory: Termux libraries are not version-pinned, so installing a
+  # single new package on an old base (e.g. new libcurl + old openssl) breaks with
+  # 'CANNOT LINK EXECUTABLE ... cannot locate symbol'. Keeping everything in sync avoids that.
+  say "Upgrading Termux packages first (keeps libraries consistent) — تحديث حزم Termux أولاً…"
+  say "This can take several minutes on an old install — قد يستغرق عدة دقائق"
+  if ! pkg upgrade "${APT_OPTS[@]}"; then
+    # 'pkg' itself needs a working curl for its mirror check; plain apt does not.
+    apt update || true
+    apt full-upgrade "${APT_OPTS[@]}" || warn "Package upgrade failed — continuing, but Termux may be in a mixed state"
+  fi
+  say "Installing Node.js LTS and git — تثبيت Node.js…"
+  if ! pkg install "${APT_OPTS[@]}" nodejs-lts git; then
+    apt install "${APT_OPTS[@]}" nodejs-lts git
+  fi
   # Optional but recommended: device APIs (notifications, clipboard, camera…)
-  pkg install -y termux-api >/dev/null 2>&1 || true
+  pkg install "${APT_OPTS[@]}" termux-api >/dev/null 2>&1 || true
   ok "Node.js $(node -p 'process.versions.node')"
 fi
 

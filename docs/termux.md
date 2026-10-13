@@ -16,12 +16,14 @@ Termux برنامج مجاني يحوّل جوالك إلى "كمبيوتر صغ
 افتح Termux، والصق هذا السطر ثم اضغط Enter:
 
 ```bash
-pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
 ```
 
 > للّصق في Termux: اضغط مطوّلاً على الشاشة ← **Paste**.
 
-السكربت يقوم بما يلي تلقائياً: تحديث Termux ← تثبيت Node.js ← تنزيل SINDAR ← تشغيل فحص الجاهزية `sindar doctor`.
+السكربت يقوم بما يلي تلقائياً: **تحديث Termux كاملاً** (مهم — يمنع تعارض المكتبات) ← تثبيت Node.js ← تنزيل SINDAR ← تشغيل فحص الجاهزية `sindar doctor`.
+
+> ⚠️ لا تثبّت حزماً منفردة قبل ذلك (مثل `pkg install curl`) — `curl` موجود أصلاً في Termux، وتثبيت حزمة واحدة فوق نظام قديم يسبب خطأ `CANNOT LINK EXECUTABLE`. أبقِ الشاشة مفتوحة والشاحن موصولاً أثناء التثبيت.
 
 في النهاية سترى تقريراً مثل:
 
@@ -62,6 +64,7 @@ pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/djoeekoe-net
 
 | المشكلة | الحل |
 |---|---|
+| `CANNOT LINK EXECUTABLE "curl": cannot locate symbol …` | Termux قديم وجرى تحديث حزمة واحدة فقط. شغّل: `apt update && apt full-upgrade -y -o Dpkg::Options::=--force-confnew` ثم أعد أمر التثبيت |
 | `sindar: command not found` بعد التثبيت | أغلق Termux تماماً وافتحه من جديد |
 | `npm ERR! 404` أو فشل التنزيل | المستودع خاص أو لم تُبنَ النسخة بعد — انتظر دقائق أو أخبرني |
 | `Unable to locate package nodejs-lts` | شغّل `pkg update` ثم أعد المحاولة |
