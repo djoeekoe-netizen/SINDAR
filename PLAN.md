@@ -426,17 +426,19 @@ Discord / WhatsApp (Baileys، مع تحذير) / Slack في M7 بنفس الوا
 | **M8** | الإضافات والوسائط | MCP + Plugin SDK + Discord + متصفح + صوت + صور + قدرات جهاز Android | 3+ جلسات |
 | **M9** | التوزيع | تثبيت بسطر، Docker، onboarding، ترحيل، Termux، توثيق، إصدار 1.0 | 2 جلسات |
 
-### M0 — الهيكل والأساس
-- [ ] pnpm workspace: `packages/core`, `packages/cli`, `packages/gateway`, `packages/ui`؛ TypeScript strict ESM؛ `tsconfig.base.json`.
-- [ ] أدوات: vitest، tsx (تطوير)، tsup (بناء)، eslint+prettier (خفيف)، `.editorconfig`.
-- [ ] `@sindar/core`: محمّل الإعدادات (`config.yaml` + `.env` + متغيرات البيئة) بـ zod، تهيئة `~/.sindar/`، logger (pino) مع حجب الأسرار، طبقة DB + migrations (`node:sqlite`) + اختبار FTS5.
-- [ ] واجهة `Provider` + مزود **mock** + قوالب `providers.yaml` (Ollama/Groq/OpenRouter/Gemini/…).
-- [ ] CLI هيكلي: `sindar --version`, `sindar doctor` (يفحص Node، المجلد، DB، المزودات المتاحة، **ويكتشف Termux** ويعرض نصائح البطارية/التخزين).
-- [ ] طبقة منصة `platform.ts`: اكتشاف Termux/Windows/macOS/Linux، مسارات (`$PREFIX`, `$TMPDIR`)، الصدَفة الافتراضية — بلا مسارات ثابتة (ADR-16).
-- [ ] **`scripts/install-termux.sh`** (نسخة أولى): يثبّت `nodejs-lts` و`git` في Termux، يجلب آخر بناء من GitHub، ويضع أمر `sindar` في المسار.
-- [ ] GitHub Actions: lint + typecheck + test على Node 22/24.
-- [ ] `LICENSE` (MIT)، `CONTRIBUTING.md`، `SECURITY.md`، `.env.example`.
-- **قبول:** `pnpm i && pnpm build && pnpm test` ينجح في CI؛ **على جوالك**: أمر تثبيت واحد في Termux ثم `sindar doctor` يعرض تقريراً صحيحاً (ويعمل أيضاً على Windows/macOS/Linux).
+### M0 — الهيكل والأساس ✅ (منجز)
+- [x] pnpm workspace: `packages/core`, `packages/cli`, `packages/gateway` (هيكل)، `packages/ui` (هيكل)؛ TypeScript strict ESM؛ `tsconfig.base.json`.
+- [x] أدوات: vitest، tsx، tsup، oxlint + prettier، `.editorconfig`.
+- [x] `@sindar/core`: محمّل الإعدادات (`config.yaml` + `.env` + `SINDAR_*`) بـ zod، تهيئة `~/.sindar/` (ملفات 0600)، logger بحجب الأسرار، طبقة DB + migrations.
+- [x] واجهة `Provider` + مزود **mock** (echo/`!tool`/سكربت) + قوالب 16 مزوداً مع وسم «مجاني/طبقة مجانية/مدفوع».
+- [x] CLI: `sindar --version`, `sindar doctor [--json] [--no-probe]`, `sindar update`؛ عربي/إنجليزي؛ يكتشف Termux ويعرض نصائح البطارية/التخزين/Termux:API.
+- [x] طبقة منصة `platform.ts` (ADR-16): اكتشاف Termux، صدَفة موجودة فعلاً، `commandExists` بلا spawn، لا مسارات ثابتة.
+- [x] `scripts/install.sh`: Termux/Linux/macOS — يثبّت Node في Termux، ينزّل الحزمة الجاهزة من إصدار `dev`، وبديل بناء من المصدر.
+- [x] GitHub Actions: `ci.yml` (Node 22/24 + Windows) و`dev-release.yml` (حزمة `sindar-cli.tgz` دوّارة).
+- [x] `LICENSE` (MIT)، `CONTRIBUTING.md`، `SECURITY.md`، `.env.example`، `docs/termux.md`.
+- [x] 37 اختباراً آلياً (كلا مشغّلي SQLite، FTS، الإعدادات، المزود الوهمي، الحجب، doctor، عقد حزمة الـ CLI).
+- **اكتشافات أثناء التنفيذ:** (1) esbuild يحذف بادئة `node:` فيكسر `node:sqlite` — حُلّ بمُعرِّف غير حرفي. (2) `sql.js` لا يحوي FTS5 بل FTS4 فقط — المخطط صار تكيفياً (FTS5 → FTS4 → بلا) ويُسجَّل النوع في جدول `meta`. (3) المستودع **خاص** — التنزيل المجهول للحزمة يتطلب جعله عاماً.
+- **قبول:** ✔ `pnpm i && pnpm build && pnpm test` ينجح محلياً؛ ⏳ على جوالك: أمر تثبيت واحد في Termux ثم `sindar doctor` (بانتظار تجربتك).
 
 ### M1 — النواة + CLI chat
 - [ ] مزود `openai-compat` (بث SSE، أدوات، usage) + مزود `anthropic`.

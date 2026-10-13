@@ -1,0 +1,65 @@
+name: Dev build
+
+# Publishes a rolling prebuilt CLI tarball to the "dev" pre-release so that
+# `scripts/install.sh` and `sindar update` can fetch it (no build tools on phones).
+on:
+  push:
+    branches: ['main', 'arena/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build (stamped with commit SHA)
+        run: pnpm build
+        env:
+          SINDAR_BUILD_SHA: ${{ github.sha }}
+      - run: pnpm test
+      - name: Pack CLI tarball
+        run: |
+          cd packages/cli
+          npm pack --pack-destination "$GITHUB_WORKSPACE" >/dev/null
+          cd "$GITHUB_WORKSPACE"
+          mv sindar-*.tgz sindar-cli.tgz
+          node -e '
+            const fs=require("fs");
+            fs.writeFileSync("version.json", JSON.stringify({
+              version: require("./packages/cli/package.json").version,
+              sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF_NAME,
+              date: new Date().toISOString(), tarball: "sindar-cli.tgz"
+            }, null, 2));'
+          ls -la sindar-cli.tgz version.json
+      - name: Upload to the rolling "dev" pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Rolling development build — commit ${GITHUB_SHA::7} (${GITHUB_REF_NAME}), $(date -u +%FT%TZ)"
+            echo
+            echo "Install / update (Termux, Linux, macOS):"
+            echo
+            echo '```bash'
+            echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/scripts/install.sh | bash"
+            echo '```'
+          } > notes.md
+          if gh release view dev >/dev/null 2>&1; then
+            gh release edit dev --prerelease --title "SINDAR dev build" --notes-file notes.md
+          else
+            gh release create dev --prerelease --title "SINDAR dev build" --notes-file notes.md
+          fi
+          gh release upload dev sindar-cli.tgz version.json --clobber

@@ -1,0 +1,7 @@
+{
+  "name": "@sindar/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SINDAR web/PWA client (React). Built in milestone M2.",
+  "license": "MIT"
+}

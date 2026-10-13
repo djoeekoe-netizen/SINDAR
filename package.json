@@ -1,0 +1,30 @@
+{
+  "name": "sindar-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint packages scripts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "sindar": "node packages/cli/dist/index.js",
+    "pack:cli": "pnpm --filter sindar run pack"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/sql.js": "^1.4.11",
+    "oxlint": "^1.88.0",
+    "prettier": "^3.9.10",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.4"
+  }
+}

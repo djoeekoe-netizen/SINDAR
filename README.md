@@ -12,14 +12,23 @@
 
 ---
 
+## 📲 التثبيت (جوال Android عبر Termux، أو Linux/macOS)
+
+```bash
+pkg install -y curl && curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
+```
+
+ثم: `sindar doctor` — الدليل المصوّر خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.
+على الكمبيوتر يكفي Node.js ≥ 22.13 ثم نفس السطر (بدون `pkg install`).
+
 ## 🚧 الحالة
 
 المشروع في بداية التنفيذ. الخطة الكاملة في **[PLAN.md](./PLAN.md)**.
 
 | المرحلة | الناتج | الحالة |
 |---|---|---|
-| **M0** | الهيكل والأساس (monorepo، config، DB، mock provider، CI، سكربت تثبيت Termux) | ⬜ التالي |
-| **M1** | النواة + CLI — محادثة بالأدوات من الطرفية (على الجوال في Termux أو على الكمبيوتر) | ⬜ |
+| **M0** | الهيكل والأساس (monorepo، config، DB، mock provider، CI، سكربت تثبيت Termux، `sindar doctor`) | ✅ |
+| **M1** | النواة + CLI — محادثة بالأدوات من الطرفية (على الجوال في Termux أو على الكمبيوتر) | ⬜ التالي |
 | **M2** | Gateway + واجهة ويب/PWA عربية/إنجليزية — تُستخدم كتطبيق من الشاشة الرئيسية | ⬜ |
 | **M3** | حلقة التعلّم — ذاكرة، بحث جلسات، مهارات ذاتية | ⬜ |
 | **M4** | قناة Telegram | ⬜ |
@@ -39,7 +48,15 @@
 
 ## ⚙️ التقنيات
 
-TypeScript · Node.js 22+ · SQLite مدمج (FTS5) · Hono · React · grammY
+TypeScript · Node.js 22+ · SQLite مدمج (FTS5، مع بديل sql.js تلقائي) · Hono · React · grammY
+
+## 🛠️ للمطورين
+
+```bash
+pnpm install && pnpm build && pnpm test
+node packages/cli/dist/index.js doctor
+```
+الهيكل: `packages/core` (النواة) · `packages/cli` (`sindar`) · `packages/gateway` (M2) · `packages/ui` (M2). انظر [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## 📄 الرخصة
 

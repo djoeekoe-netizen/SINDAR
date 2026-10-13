@@ -1,0 +1,33 @@
+{
+  "name": "sindar",
+  "version": "0.1.0",
+  "description": "SINDAR — free, self-hosted personal AI agent (runs on Android via Termux or any computer)",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "sindar": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pack": "npm pack --pack-destination ../../"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "dotenv": "^18.0.7",
+    "picocolors": "^1.1.1",
+    "sql.js": "^1.14.2",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@sindar/core": "workspace:*"
+  }
+}
