@@ -438,7 +438,7 @@ Discord / WhatsApp (Baileys، مع تحذير) / Slack في M7 بنفس الوا
 - [x] `LICENSE` (MIT)، `CONTRIBUTING.md`، `SECURITY.md`، `.env.example`، `docs/termux.md`.
 - [x] 37 اختباراً آلياً (كلا مشغّلي SQLite، FTS، الإعدادات، المزود الوهمي، الحجب، doctor، عقد حزمة الـ CLI).
 - **اكتشافات أثناء التنفيذ:** (1) esbuild يحذف بادئة `node:` فيكسر `node:sqlite` — حُلّ بمُعرِّف غير حرفي. (2) `sql.js` لا يحوي FTS5 بل FTS4 فقط — المخطط صار تكيفياً (FTS5 → FTS4 → بلا) ويُسجَّل النوع في جدول `meta`. (3) المستودع **خاص** — التنزيل المجهول للحزمة يتطلب جعله عاماً.
-- **قبول:** ✔ `pnpm i && pnpm build && pnpm test` ينجح محلياً؛ ⏳ على جوالك: أمر تثبيت واحد في Termux ثم `sindar doctor` (بانتظار تجربتك).
+- **قبول:** ✔ `pnpm i && pnpm build && pnpm test` أخضر محلياً وفي CI (Linux + Windows)؛ ✔ **تم التحقق على جوال المستخدم (2026-10-14)**: تثبيت بأمر واحد في Termux ثم `sindar doctor` → Android/Termux · arm64 · `node:sqlite` + FTS5 · 7.4 GB RAM · Termux:API مثبت · «جاهز مع تنبيهين» (النموذج التجريبي + لا مفتاح بعد — وهما المطلوبان في M1).
 
 ### M1 — النواة + CLI chat
 - [ ] مزود `openai-compat` (بث SSE، أدوات، usage) + مزود `anthropic`.
