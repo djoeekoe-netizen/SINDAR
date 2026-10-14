@@ -233,6 +233,12 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           skills: skillStore,
           toolNames,
           turnsSinceMemorySave: store.turnsSinceTool(session.id, 'memory'),
+          recentSessions: toolNames.has('session_search')
+            ? store
+                .list({ limit: 8 })
+                .filter((s) => s.id !== session.id && s.messageCount > 0)
+                .slice(0, 5)
+            : undefined,
         }),
         ...(opts.extraSections ?? []),
       ],

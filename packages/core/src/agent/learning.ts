@@ -8,12 +8,41 @@ import { isValidSkillName, type SkillStore } from '../skills/index.js';
  * the periodic memory nudge, and the optional post-task skill reflection.
  */
 
+export interface RecentSession {
+  id: string;
+  title: string | null;
+  updatedAt: number;
+  lastMessage?: string | null;
+}
+
 export interface LearningSectionsInput {
   config: Config;
   memory: MemoryFiles;
   skills: SkillStore;
   toolNames: Set<string>;
   turnsSinceMemorySave: number;
+  /** Latest other conversations (newest first), so "what were we working on?" has an answer. */
+  recentSessions?: RecentSession[];
+  now?: number;
+}
+
+const MAX_RECENT = 5;
+
+function ago(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60_000));
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+/** One line per recent conversation: `- [id] title (2h ago) — last reply…` */
+export function formatRecentSessions(list: RecentSession[], now = Date.now()): string[] {
+  return list.slice(0, MAX_RECENT).map((s) => {
+    const title = (s.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) || '(untitled)';
+    const last = (s.lastMessage ?? '').replace(/\s+/g, ' ').trim().slice(0, 50);
+    return `- [${s.id}] ${title} (${ago(now - s.updatedAt)})${last ? ` — ${last}…` : ''}`;
+  });
 }
 
 export function learningSections(input: LearningSectionsInput): string[] {
@@ -32,6 +61,13 @@ export function learningSections(input: LearningSectionsInput): string[] {
       lines.push(
         'Past conversations are searchable with `session_search` — use it when the user refers to earlier work instead of asking them to repeat.',
       );
+      const recent = input.recentSessions ?? [];
+      if (recent.length) {
+        lines.push(
+          'Latest conversations (newest first; `session_search` with sessionId reads one in full):',
+          ...formatRecentSessions(recent, input.now),
+        );
+      }
     }
     // Nudge on every Nth user turn without a save (8, 16, 24…) — a reminder, not nagging.
     const every = config.memory.nudgeEvery;

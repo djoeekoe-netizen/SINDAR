@@ -121,6 +121,10 @@ describe('memory files', () => {
       expect(sys).toContain('# Memory');
       expect(sys).toContain('# Skills');
       expect(sys).not.toContain('Memory check');
+      // …and sees the latest other conversations (title + id), never itself.
+      expect(sys).toContain('Latest conversations');
+      expect(sys).toContain(`[${s1.id}]`);
+      expect(sys).not.toContain(`[${s2.id}]`);
       await runTurn(rt, { session: s2, input: 'again', policy: policy() });
       const nudged = mock.requests.at(-1)!.messages[0]!.content as string;
       expect(nudged).toContain('Memory check: 2 user turns');
