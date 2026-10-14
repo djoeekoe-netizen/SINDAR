@@ -26,6 +26,8 @@ export interface StoredMessage extends ChatMessage {
 
 export interface SessionSummaryRow extends Session {
   messageCount: number;
+  /** Preview of the latest user/assistant text (for session lists). */
+  lastMessage: string | null;
 }
 
 interface SessionRow {
@@ -42,6 +44,7 @@ interface SessionRow {
   created_at: number;
   updated_at: number;
   message_count?: number;
+  last_message?: string | null;
 }
 interface MessageRow {
   seq: number;
@@ -69,6 +72,18 @@ const toSession = (r: SessionRow): Session => ({
   approvalMode: r.approval_mode,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+});
+
+const SUMMARY_COLS = `s.*,
+  (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS message_count,
+  (SELECT substr(m.content, 1, 160) FROM messages m
+     WHERE m.session_id = s.id AND m.role IN ('user', 'assistant') AND m.content <> ''
+     ORDER BY m.seq DESC LIMIT 1) AS last_message`;
+
+const toSummary = (r: SessionRow): SessionSummaryRow => ({
+  ...toSession(r),
+  messageCount: r.message_count ?? 0,
+  lastMessage: r.last_message ?? null,
 });
 
 export function contentToText(c: Content | null | undefined): string {
@@ -144,16 +159,22 @@ export class SessionStore {
     const limit = opts.limit ?? 20;
     const rows = opts.channel
       ? this.db.all<SessionRow>(
-          `SELECT s.*, (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS message_count
-           FROM sessions s WHERE channel = ? ORDER BY updated_at DESC LIMIT ?`,
+          `SELECT ${SUMMARY_COLS} FROM sessions s WHERE channel = ? ORDER BY updated_at DESC LIMIT ?`,
           [opts.channel, limit],
         )
       : this.db.all<SessionRow>(
-          `SELECT s.*, (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS message_count
-           FROM sessions s ORDER BY updated_at DESC LIMIT ?`,
+          `SELECT ${SUMMARY_COLS} FROM sessions s ORDER BY updated_at DESC LIMIT ?`,
           [limit],
         );
-    return rows.map((r) => ({ ...toSession(r), messageCount: r.message_count ?? 0 }));
+    return rows.map(toSummary);
+  }
+
+  /** One session with its message count and last message preview (same shape as `list()`). */
+  summary(id: string): SessionSummaryRow | undefined {
+    const r = this.db.get<SessionRow>(`SELECT ${SUMMARY_COLS} FROM sessions s WHERE s.id = ?`, [
+      id,
+    ]);
+    return r ? toSummary(r) : undefined;
   }
 
   update(

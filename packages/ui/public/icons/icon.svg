@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f2a3a"/>
+      <stop offset="1" stop-color="#113f4f"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="1" stop-color="#f6b73c"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- speech bubble -->
+  <path d="M136 150h240a40 40 0 0 1 40 40v140a40 40 0 0 1-40 40H236l-72 58v-58h-28a40 40 0 0 1-40-40V190a40 40 0 0 1 40-40z" fill="url(#bubble)" opacity="0.95"/>
+  <!-- spark -->
+  <path d="M300 182c6 44 22 60 66 66-44 6-60 22-66 66-6-44-22-60-66-66 44-6 60-22 66-66z" fill="url(#spark)"/>
+  <circle cx="214" cy="212" r="12" fill="#ffffff" opacity="0.9"/>
+  <circle cx="214" cy="300" r="9" fill="#ffffff" opacity="0.5"/>
+</svg>

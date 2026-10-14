@@ -18,7 +18,7 @@
 curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3c48-sindar/scripts/install.sh | bash
 ```
 
-ثم: `sindar onboard` (اختيار نموذج مجاني ولصق المفتاح) ← `sindar chat`. الدليل خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.
+ثم: `sindar onboard` (اختيار نموذج مجاني ولصق المفتاح) ← `sindar chat` في الطرفية، أو `sindar gateway start` ثم `sindar dashboard` لفتح **الواجهة في المتصفح** (أضفها للشاشة الرئيسية لتصبح تطبيقاً). الدليل خطوة بخطوة للجوال في **[docs/termux.md](./docs/termux.md)**.
 على الكمبيوتر يكفي Node.js ≥ 22.13 ثم نفس السطر (بدون `pkg install`).
 
 ## 🚧 الحالة
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3
 |---|---|---|
 | **M0** | الهيكل والأساس (monorepo، config، DB، mock provider، CI، سكربت تثبيت Termux، `sindar doctor`) | ✅ |
 | **M1** | النواة + CLI — `sindar onboard` و`sindar chat` بالأدوات (ملفات، طرفية، ويب) مع موافقات | ✅ مكتمل ومُختبر على الجوال |
-| **M2** | Gateway + واجهة ويب/PWA عربية/إنجليزية — تُستخدم كتطبيق من الشاشة الرئيسية | ⬜ |
+| **M2** | Gateway + واجهة ويب/PWA عربية/إنجليزية — تُستخدم كتطبيق من الشاشة الرئيسية | ✅ مكتمل — بانتظار اختبار الجوال |
 | **M3** | حلقة التعلّم — ذاكرة، بحث جلسات، مهارات ذاتية | ⬜ |
 | **M4** | قناة Telegram | ⬜ |
 | **M5** | **تطبيق Android (APK)** + تطبيق سطح المكتب (Windows/macOS/Linux) | ⬜ |
@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3
 
 ## ⚙️ التقنيات
 
-TypeScript · Node.js 22+ · SQLite مدمج (FTS5، مع بديل sql.js تلقائي) · Hono · React · grammY
+TypeScript · Node.js 22+ · SQLite مدمج (FTS5، مع بديل sql.js تلقائي) · Hono + WebSocket · Preact (PWA) · grammY
 
 ## 🛠️ للمطورين
 
@@ -56,7 +56,7 @@ TypeScript · Node.js 22+ · SQLite مدمج (FTS5، مع بديل sql.js تلق
 pnpm install && pnpm build && pnpm test
 node packages/cli/dist/index.js doctor
 ```
-الهيكل: `packages/core` (النواة) · `packages/cli` (`sindar`) · `packages/gateway` (M2) · `packages/ui` (M2). انظر [CONTRIBUTING.md](./CONTRIBUTING.md).
+الهيكل: `packages/core` (النواة) · `packages/gateway` (خادم HTTP/WS) · `packages/ui` (الواجهة — تُبنى إلى `packages/cli/ui`) · `packages/cli` (`sindar`). الواجهة أثناء التطوير: `pnpm --filter @sindar/ui dev` (تمرّر `/api` و`/ws` إلى `SINDAR_GATEWAY_URL`). انظر [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## 📄 الرخصة
 

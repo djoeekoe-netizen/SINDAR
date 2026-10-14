@@ -52,7 +52,7 @@ export const en: Record<keyof typeof ar, string> = {
   'update.fail': 'Update failed: {error}',
   'update.npm.missing': 'npm not found on PATH',
   'cli.hint':
-    'Start with: sindar onboard (setup), then sindar chat · sindar doctor for a health check',
+    'Start with: sindar onboard (setup), then sindar dashboard (web UI) or sindar chat (terminal) · sindar doctor for a health check',
 
   // ---- chat ----
   'chat.session.new': 'New session {id} · model: {model}',
@@ -152,6 +152,30 @@ export const en: Record<keyof typeof ar, string> = {
   'config.invalid': 'Invalid value: {error}',
   'config.path': 'Config file: {path}',
   'config.unknown': 'No such key: {key}',
+  'gateway.started': 'SINDAR gateway is running at {url}',
+  'gateway.already': 'SINDAR gateway was already running at {url}',
+  'gateway.open.title': 'Open the web UI with this link (it contains your access token):',
+  'gateway.open.termux':
+    'In Termux: long-press the link → Open link. Then in the browser menu: "Add to Home screen".',
+  'gateway.open.manual': 'Could not open a browser automatically — copy the link above.',
+  'gateway.qr.local':
+    'The gateway listens on this device only (127.0.0.1). For other devices: sindar gateway start --host 0.0.0.0',
+  'gateway.foreground.hint': 'Press Ctrl+C to stop.',
+  'gateway.bg.hint':
+    'Running in the background. Stop: sindar gateway stop — status: sindar gateway status — log: sindar gateway logs',
+  'gateway.stopping': 'Stopping…',
+  'gateway.stopped': 'SINDAR gateway stopped.',
+  'gateway.stop.foreign':
+    'A gateway is running but was not started by me (another terminal?) — stop it there with Ctrl+C.',
+  'gateway.start.failed': 'The gateway did not start. See the log: {log}',
+  'gateway.status.up': 'running ✓ {url} (up {uptime})',
+  'gateway.status.detail':
+    'model {model} · sessions {sessions} · running {running} · pending approvals {pending} · version {version}',
+  'gateway.status.pending': 'Approvals are waiting for you — open the web UI.',
+  'gateway.status.down': 'not running — start it with: sindar gateway start  ({url})',
+  'gateway.logs.none': 'No log yet ({file})',
+  'gateway.token.rotated':
+    'Access token rotated — reopen the UI from the new link (sindar dashboard).',
   'sessions.title': 'Recent sessions:',
   'sessions.none': 'No sessions yet',
   'sessions.row': '{id}  {when}  {count} msgs  {model}  {title}',

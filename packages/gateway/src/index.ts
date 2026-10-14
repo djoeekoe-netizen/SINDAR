@@ -1,6 +1,9 @@
-/** Placeholder — the Gateway (HTTP + WebSocket control plane) is built in milestone M2. */
-export const GATEWAY_DEFAULT_PORT = 18789;
-
-export function createGateway(): never {
-  throw new Error('SINDAR Gateway is not implemented yet (milestone M2)');
-}
+export * from './protocol.js';
+export {
+  createGateway,
+  GATEWAY_DEFAULT_PORT,
+  type Gateway,
+  type GatewayOptions,
+} from './server.js';
+export { TurnManager, serializeEvent, toMessageDTO, toSessionDTO } from './runner.js';
+export { loadOrCreateToken, rotateToken, tokenPath, TOKEN_FILE } from './token.js';

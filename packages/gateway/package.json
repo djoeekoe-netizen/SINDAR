@@ -1,7 +1,7 @@
 {
   "name": "@sindar/gateway",
   "version": "0.1.0",
-  "description": "SINDAR gateway — local control plane (HTTP/WS, channels, cron). Implemented in M2.",
+  "description": "SINDAR gateway — local control plane: HTTP + WebSocket API, static web UI, approvals.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,8 +22,13 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "hono": "^4.13.0",
+    "ws": "^8.22.0"
+  },
   "devDependencies": {
-    "@sindar/core": "workspace:*"
+    "@sindar/core": "workspace:*",
+    "@types/ws": "^8.18.0"
   }
 }

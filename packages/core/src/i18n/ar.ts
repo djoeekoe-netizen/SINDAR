@@ -50,7 +50,8 @@ export const ar = {
   'update.done': 'تم التحديث. شغّل: sindar doctor',
   'update.fail': 'فشل التحديث: {error}',
   'update.npm.missing': 'npm غير موجود في المسار',
-  'cli.hint': 'ابدأ بـ: sindar onboard (الإعداد) ثم sindar chat (المحادثة) · sindar doctor للفحص',
+  'cli.hint':
+    'ابدأ بـ: sindar onboard (الإعداد) ثم sindar dashboard (الواجهة) أو sindar chat (الطرفية) · sindar doctor للفحص',
 
   // ---- chat ----
   'chat.session.new': 'جلسة جديدة {id} · النموذج: {model}',
@@ -150,6 +151,30 @@ export const ar = {
   'config.invalid': 'قيمة غير صالحة: {error}',
   'config.path': 'ملف الإعدادات: {path}',
   'config.unknown': 'لا يوجد مفتاح بهذا الاسم: {key}',
+  'gateway.started': 'خادم SINDAR يعمل على {url}',
+  'gateway.already': 'خادم SINDAR يعمل مسبقاً على {url}',
+  'gateway.open.title': 'افتح الواجهة من هذا الرابط (فيه رمز الدخول):',
+  'gateway.open.termux':
+    'في Termux: اضغط مطوّلاً على الرابط ← Open link. ثم من قائمة المتصفح: «إضافة إلى الشاشة الرئيسية».',
+  'gateway.open.manual': 'لم أستطع فتح المتصفح تلقائياً — انسخ الرابط أعلاه.',
+  'gateway.qr.local':
+    'الخادم يستمع على هذا الجهاز فقط (127.0.0.1). للوصول من جهاز آخر: sindar gateway start --host 0.0.0.0',
+  'gateway.foreground.hint': 'اضغط Ctrl+C للإيقاف.',
+  'gateway.bg.hint':
+    'يعمل في الخلفية. للإيقاف: sindar gateway stop — للحالة: sindar gateway status — السجل: sindar gateway logs',
+  'gateway.stopping': 'جارٍ الإيقاف…',
+  'gateway.stopped': 'توقف خادم SINDAR.',
+  'gateway.stop.foreign':
+    'الخادم يعمل لكن لم أبدأه أنا (ربما في نافذة أخرى) — أوقفه بـ Ctrl+C هناك.',
+  'gateway.start.failed': 'لم يبدأ الخادم. انظر السجل: {log}',
+  'gateway.status.up': 'يعمل ✓ {url} (منذ {uptime})',
+  'gateway.status.detail':
+    'النموذج {model} · الجلسات {sessions} · قيد التنفيذ {running} · موافقات معلّقة {pending} · الإصدار {version}',
+  'gateway.status.pending': 'هناك موافقات بانتظارك — افتح الواجهة.',
+  'gateway.status.down': 'متوقف — شغّله بـ: sindar gateway start  ({url})',
+  'gateway.logs.none': 'لا يوجد سجل بعد ({file})',
+  'gateway.token.rotated':
+    'تم تغيير رمز الدخول — افتح الواجهة من الرابط الجديد (sindar dashboard).',
   'sessions.title': 'آخر الجلسات:',
   'sessions.none': 'لا توجد جلسات بعد',
   'sessions.row': '{id}  {when}  {count} رسالة  {model}  {title}',

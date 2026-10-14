@@ -8,7 +8,8 @@
     "sindar": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "ui"
   ],
   "engines": {
     "node": ">=22.13"
@@ -20,14 +21,22 @@
     "pack": "npm pack --pack-destination ../../"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.5",
     "commander": "^15.0.0",
     "dotenv": "^18.0.7",
+    "hono": "^4.13.0",
     "picocolors": "^1.1.1",
+    "qrcode-terminal": "^0.12.0",
     "sql.js": "^1.14.2",
+    "ws": "^8.22.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@sindar/core": "workspace:*"
+    "@sindar/core": "workspace:*",
+    "@sindar/gateway": "workspace:*",
+    "@sindar/ui": "workspace:*",
+    "@types/qrcode-terminal": "^0.12.2",
+    "@types/ws": "^8.18.0"
   }
 }

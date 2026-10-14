@@ -25,3 +25,4 @@ minimumReleaseAgeExclude:
   - '@oxlint/binding-win32-ia32-msvc@1.88.0'
   - '@oxlint/binding-win32-x64-msvc@1.88.0'
   - oxlint@1.88.0
+  - '@hono/node-server@2.1.5'
