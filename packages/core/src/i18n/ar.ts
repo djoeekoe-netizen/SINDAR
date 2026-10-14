@@ -79,6 +79,8 @@ export const ar = {
   'chat.error.ratelimit':
     '⏳ الخدمة مزدحمة (حدّ الاستخدام المجاني). انتظر نحو {seconds} ثانية ثم أعد إرسال الرسالة — أو أضف نموذجاً احتياطياً: sindar model --fallbacks …',
   'chat.error.auth': 'المفتاح مرفوض من المزود. أعد الإعداد: sindar onboard',
+  'chat.error.network':
+    'تعذّر الوصول إلى خوادم النموذج ({error}). تأكد من الإنترنت أو الـ VPN. وإن كان Termux في الخلفية على Huawei/Xiaomi فاسمح له بالعمل في الخلفية: الإعدادات ← التطبيقات ← Termux ← البطارية ← تشغيل التطبيق ← إدارة يدوية (فعّل الثلاثة).',
   'chat.error.nokey': 'لا يوجد مفتاح لمزود النموذج. شغّل: sindar onboard',
   'chat.undo.ok': '↶ حُذفت آخر رسالة لك وردّها',
   'chat.undo.none': 'لا يوجد ما يُتراجع عنه',
@@ -130,6 +132,8 @@ export const ar = {
   'onboard.fallbacks': 'نماذج احتياطية عند الازدحام: {models}',
   'chat.retry.wait':
     '⏳ الخدمة مزدحمة ({model}) — انتظار {seconds} ثانية ثم إعادة المحاولة ({attempt}/3)…',
+  'chat.retry.wait.network':
+    '📡 تعذّر الاتصال بـ {model} (الإنترنت؟) — انتظار {seconds} ثانية ثم إعادة المحاولة ({attempt}/3)…',
   'onboard.saved': 'تم الحفظ: النموذج الافتراضي {model}',
   'onboard.test': 'اختبار سريع…',
   'onboard.test.reply': 'الرد: {text}',

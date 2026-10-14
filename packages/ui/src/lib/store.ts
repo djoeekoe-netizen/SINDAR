@@ -187,10 +187,18 @@ function notice(level: NoticeItem['level'], text: string): void {
   push({ kind: 'notice', id: nid(), level, text });
 }
 
+const NETWORK_RE =
+  /fetch failed|UND_ERR|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|socket hang up|idle timeout/i;
+export const isNetworkError = (message: string): boolean => NETWORK_RE.test(message);
+
 export function friendlyError(message: string, code?: string): string {
   const l = lang.value;
   if (code === 'rate_limit' || /HTTP 429|rate limit/i.test(message))
     return t(l, 'error.rate_limit');
+  if (code === 'network' || isNetworkError(message)) {
+    const m = /\(([A-Z_]+)\)/.exec(message);
+    return t(l, 'error.network', { message: m?.[1] ?? message.slice(0, 80) });
+  }
   if (/no API key/i.test(message)) return t(l, 'error.nokey');
   if (code === 'auth' || /HTTP 401|HTTP 403/.test(message)) return t(l, 'error.auth');
   return t(l, 'error.generic', {
@@ -281,11 +289,15 @@ function applyEvent(ev: EventDTO): void {
     case 'retry_wait':
       notice(
         'warn',
-        t(lang.value, 'notice.retry_wait', {
-          model: ev.model,
-          seconds: ev.seconds,
-          attempt: ev.attempt,
-        }),
+        t(
+          lang.value,
+          isNetworkError(ev.reason) ? 'notice.retry_wait.network' : 'notice.retry_wait',
+          {
+            model: ev.model,
+            seconds: ev.seconds,
+            attempt: ev.attempt,
+          },
+        ),
       );
       break;
     case 'notice':
@@ -307,6 +319,8 @@ function applyEvent(ev: EventDTO): void {
 }
 
 function shortReason(reason: string): string {
+  if (/HTTP 429|rate limit/i.test(reason)) return t(lang.value, 'reason.rate_limit');
+  if (isNetworkError(reason)) return t(lang.value, 'reason.network');
   const m = /HTTP \d+/.exec(reason);
   return m ? m[0] : reason.length > 60 ? `${reason.slice(0, 60)}…` : reason;
 }

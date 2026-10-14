@@ -128,6 +128,41 @@ describe('agent loop (mock provider)', () => {
     }
   });
 
+  it('waits for the network before switching models on connection failures', async () => {
+    const offline = createMockProvider({
+      script: [{ error: { message: 'fetch failed (UND_ERR_CONNECT_TIMEOUT)', code: 'network' } }],
+    });
+    const rt = await makeRuntime(
+      {
+        model: { default: 'offline:m1', fallbacks: ['mock:echo'] },
+        providers: { offline: { type: 'mock' }, mock: {} },
+      },
+      { instances: { offline } },
+    );
+    try {
+      const session = rt.store.create({ channel: 'cli' });
+      const ac = new AbortController();
+      const events: AgentEvent[] = [];
+      const onEvent = (e: AgentEvent) => {
+        events.push(e);
+        if (e.type === 'retry_wait') ac.abort(); // don't actually sleep 5 s in the test
+      };
+      const res = await runTurn(rt, {
+        session,
+        input: 'hi',
+        policy: policy(),
+        onEvent,
+        signal: ac.signal,
+      });
+      expect(res.finishReason).toBe('cancelled');
+      const first = events.find((e) => e.type === 'retry_wait' || e.type === 'model_switch');
+      expect(first).toMatchObject({ type: 'retry_wait', model: 'offline:m1', seconds: 5 });
+      expect(events.some((e) => e.type === 'model_switch')).toBe(false);
+    } finally {
+      await rt.cleanup();
+    }
+  });
+
   it('falls back to the next model on retryable errors and surfaces auth errors', async () => {
     const flaky = createMockProvider({
       script: [{ error: { message: 'busy', code: 'rate_limit' } }],

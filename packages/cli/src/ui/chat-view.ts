@@ -1,5 +1,11 @@
 import pc from 'picocolors';
-import { t, type AgentEvent, type ApprovalRequest, type Lang } from '@sindar/core';
+import {
+  isNetworkErrorMessage,
+  t,
+  type AgentEvent,
+  type ApprovalRequest,
+  type Lang,
+} from '@sindar/core';
 
 export interface ChatView {
   onEvent(ev: AgentEvent): void;
@@ -126,11 +132,15 @@ export function createChatView(
         case 'retry_wait':
           status(
             c.yellow(
-              t(lang, 'chat.retry.wait', {
-                model: ev.model,
-                seconds: ev.seconds,
-                attempt: ev.attempt,
-              }),
+              t(
+                lang,
+                isNetworkErrorMessage(ev.reason) ? 'chat.retry.wait.network' : 'chat.retry.wait',
+                {
+                  model: ev.model,
+                  seconds: ev.seconds,
+                  attempt: ev.attempt,
+                },
+              ),
             ),
           );
           break;

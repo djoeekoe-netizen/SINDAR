@@ -72,8 +72,14 @@ const ar = {
   'notice.model_switch': 'تم التحويل إلى {to} ({reason})',
   'notice.compress': 'تم ضغط السياق ({before} ← {after} رمز)',
   'notice.retry_wait': '⏳ {model} مزدحم — انتظار {seconds} ثانية ثم إعادة المحاولة ({attempt}/3)',
+  'notice.retry_wait.network':
+    '📡 تعذّر الاتصال بـ {model} — انتظار {seconds} ثانية ثم إعادة المحاولة ({attempt}/3)',
+  'reason.network': 'انقطاع الاتصال',
+  'reason.rate_limit': 'مزدحم',
   'notice.length': 'توقف الرد لبلوغ الحد الأقصى — اكتب «أكمل» للمتابعة.',
   'error.generic': 'خطأ: {message}',
+  'error.network':
+    '📡 العقل لم يستطع الوصول إلى الإنترنت ({message}).\n• تأكد من الواي فاي أو البيانات (والـ VPN إن وُجد).\n• على Huawei/Xiaomi: الجوال يقطع الإنترنت عن Termux في الخلفية — الإعدادات ← التطبيقات ← Termux ← البطارية ← «تشغيل التطبيق» ← إدارة يدوية وفعّل الخيارات الثلاثة، ثم «استخدام البيانات» ← اسمح بالبيانات في الخلفية.\n• حل سريع: افتح Termux ثم ارجع هنا وأرسل من جديد.',
   'error.rate_limit':
     '⏳ الخدمة مزدحمة (حدّ الاستخدام المجاني). انتظر قليلاً ثم أعد الإرسال، أو بدّل النموذج.',
   'error.auth': 'المفتاح مرفوض من المزود — أعد الإعداد في Termux: sindar onboard',
@@ -200,8 +206,14 @@ const en: Record<Key, string> = {
   'notice.model_switch': 'Switched to {to} ({reason})',
   'notice.compress': 'Context compressed ({before} → {after} tokens)',
   'notice.retry_wait': '⏳ {model} is busy — waiting {seconds}s then retrying ({attempt}/3)',
+  'notice.retry_wait.network':
+    '📡 Cannot reach {model} — waiting {seconds}s then retrying ({attempt}/3)',
+  'reason.network': 'connection lost',
+  'reason.rate_limit': 'busy',
   'notice.length': 'The reply hit the length limit — say "continue" to go on.',
   'error.generic': 'Error: {message}',
+  'error.network':
+    '📡 The brain could not reach the internet ({message}).\n• Check Wi-Fi/mobile data (and VPN if any).\n• Huawei/Xiaomi cut internet for Termux in the background — Settings → Apps → Termux → Battery → App launch → Manage manually (enable all three), then Data usage → allow background data.\n• Quick fix: open Termux once, come back here and resend.',
   'error.rate_limit':
     '⏳ The provider is busy (free-tier limit). Wait a bit and resend, or switch model.',
   'error.auth': 'The provider rejected the key — in Termux run: sindar onboard',

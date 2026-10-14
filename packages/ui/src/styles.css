@@ -682,6 +682,9 @@ pre {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
   border-radius: 12px;
+  text-align: start;
+  white-space: pre-wrap;
+  padding: 8px 12px;
 }
 
 /* ---- composer ---- */

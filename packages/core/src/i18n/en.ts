@@ -81,6 +81,8 @@ export const en: Record<keyof typeof ar, string> = {
   'chat.error.ratelimit':
     '⏳ The provider is busy (free-tier rate limit). Wait about {seconds}s and resend — or add a fallback model: sindar model --fallbacks …',
   'chat.error.auth': 'The provider rejected the key. Run: sindar onboard',
+  'chat.error.network':
+    'Cannot reach the model provider ({error}). Check internet/VPN. If Termux is in the background on Huawei/Xiaomi, allow it to run in the background: Settings → Apps → Termux → Battery → App launch → Manage manually (enable all three).',
   'chat.error.nokey': 'No API key for the model provider. Run: sindar onboard',
   'chat.undo.ok': '↶ removed your last message and its reply',
   'chat.undo.none': 'Nothing to undo',
@@ -131,6 +133,8 @@ export const en: Record<keyof typeof ar, string> = {
   'onboard.model.fetching': 'Fetching model list…',
   'onboard.fallbacks': 'Fallback models when busy: {models}',
   'chat.retry.wait': '⏳ {model} is busy — waiting {seconds}s then retrying ({attempt}/3)…',
+  'chat.retry.wait.network':
+    '📡 Cannot reach {model} (internet?) — waiting {seconds}s then retrying ({attempt}/3)…',
   'onboard.saved': 'Saved: default model {model}',
   'onboard.test': 'Quick test…',
   'onboard.test.reply': 'Reply: {text}',

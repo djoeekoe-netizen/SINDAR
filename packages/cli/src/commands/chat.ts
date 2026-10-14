@@ -4,6 +4,7 @@ import pc from 'picocolors';
 import {
   AgentError,
   createPolicyState,
+  isNetworkErrorMessage,
   runTurn,
   t,
   type ApprovalAnswer,
@@ -25,6 +26,10 @@ function describeError(app: App, err: unknown): string {
   if (code === 'auth' && (cause as { status?: number })?.status)
     return t(app.lang, 'chat.error.auth');
   const msg = e?.message ?? String(err);
+  if (code === 'network' || isNetworkErrorMessage(msg))
+    return t(app.lang, 'chat.error.network', {
+      error: msg.length > 160 ? `${msg.slice(0, 160)}…` : msg,
+    });
   return t(app.lang, 'chat.error', { error: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg });
 }
 import { createChatView } from '../ui/chat-view.js';

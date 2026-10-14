@@ -361,7 +361,10 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           code: (e as ProviderError).code,
           error: e.message,
         });
-        if (!streamed && switchTarget(e.message)) {
+        // A connection failure (no internet, Termux throttled in the background…) hits every
+        // provider alike, so wait for the network first and only then try the fallbacks.
+        const isNetwork = (e as ProviderError).code === 'network';
+        if (!streamed && !isNetwork && switchTarget(e.message)) {
           // Re-assemble with the new target's context window in mind.
           messages = await maybeCompress(assemble());
           continue;
@@ -369,7 +372,8 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
         // Nothing left to fall back to: for short rate limits / transient errors, wait and retry.
         if (retryable && !streamed && waits < MAX_WAITS) {
           const hinted = e instanceof ProviderError ? e.retryAfterMs : undefined;
-          const ms = Math.min(MAX_WAIT_MS, hinted !== undefined ? hinted + 500 : 2000 * 2 ** waits);
+          const base = isNetwork ? 5000 : 2000;
+          const ms = Math.min(MAX_WAIT_MS, hinted !== undefined ? hinted + 500 : base * 2 ** waits);
           waits++;
           emit({
             type: 'retry_wait',
@@ -380,6 +384,12 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           });
           const aborted = await sleep(ms, signal);
           if (!aborted) continue;
+          turnFinish = 'cancelled';
+          break;
+        }
+        if (!streamed && isNetwork && switchTarget(e.message)) {
+          messages = await maybeCompress(assemble());
+          continue;
         }
         emit({ type: 'error', error: e });
         if (text) store.append(session.id, { role: 'assistant', content: text });

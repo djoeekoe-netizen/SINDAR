@@ -68,6 +68,13 @@ export function parseRetryAfter(header: string | null, text = ''): number | unde
   return Math.ceil(minutes * 60_000 + ms);
 }
 
+/** True for connection-level failures (no internet, DNS, timeout, reset) as opposed to HTTP errors. */
+export const NETWORK_ERROR_RE =
+  /fetch failed|UND_ERR|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|socket hang up|idle timeout|network/i;
+export function isNetworkErrorMessage(message: string): boolean {
+  return NETWORK_ERROR_RE.test(message);
+}
+
 /** Wrap network-level failures (DNS, refused, aborted) into ProviderError. */
 export function networkError(err: unknown, provider: string, cancelled = false): ProviderError {
   if (cancelled) return new ProviderError(`${provider}: cancelled`, 'unknown', undefined, false);
