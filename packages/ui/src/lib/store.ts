@@ -522,8 +522,12 @@ function historyToItems(msgs: MessageDTO[]): Item[] {
         let summary = c.name;
         try {
           const a = JSON.parse(c.arguments) as Record<string, unknown>;
-          const v = a.command ?? a.path ?? a.url ?? a.query ?? a.pattern;
-          if (typeof v === 'string') summary = `${c.name} ${v}`;
+          // Mirror the server-side summaries closely enough for history (no tool code in the UI).
+          const action = typeof a.action === 'string' ? ` ${a.action}` : '';
+          const target = c.name === 'memory' && typeof a.target === 'string' ? ` ${a.target}` : '';
+          const v =
+            a.command ?? a.path ?? a.url ?? a.query ?? a.pattern ?? a.name ?? a.text ?? a.sessionId;
+          summary = `${c.name}${action}${target}${typeof v === 'string' ? `: ${v.slice(0, 80)}` : ''}`;
         } catch {
           /* keep name */
         }
