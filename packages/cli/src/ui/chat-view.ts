@@ -12,7 +12,7 @@ export interface ChatView {
 export function createChatView(
   lang: Lang,
   out: NodeJS.WritableStream = process.stdout,
-  opts: { quiet?: boolean; color?: boolean } = {},
+  opts: { quiet?: boolean; color?: boolean; reasoning?: boolean } = {},
 ): ChatView {
   const color = opts.color ?? Boolean((out as NodeJS.WriteStream).isTTY);
   const c = {
@@ -56,10 +56,14 @@ export function createChatView(
           write(ev.delta);
           break;
         case 'reasoning':
-          if (!opts.quiet) {
+          if (opts.reasoning && !opts.quiet) {
             if (!reasoningShown && !atLineStart) write('\n');
             reasoningShown = true;
             write(c.dim(ev.delta));
+          } else if (color && !progressLine) {
+            // Hidden by default (it is usually English and noisy): show a one-line indicator.
+            progressLine = 'thinking';
+            out.write(`\r\x1b[2K${c.dim(`💭 ${t(lang, 'chat.thinking')}`)}`);
           }
           break;
         case 'tool_start':

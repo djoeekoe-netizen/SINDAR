@@ -60,6 +60,7 @@ export const en: Record<keyof typeof ar, string> = {
   'chat.hint':
     'Type a message and press Enter · /help for commands · Ctrl+C stops the reply or exits',
   'chat.thinking': 'thinking…',
+  'chat.thinking': 'thinking…',
   'chat.tool.run': '⚙ {summary}',
   'chat.tool.done': '✓ {name} ({ms}ms)',
   'chat.tool.error': '✖ {name}: {error}',

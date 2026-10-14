@@ -57,6 +57,7 @@ export const ar = {
   'chat.session.resumed': 'استئناف الجلسة {id} ({count} رسالة) · النموذج: {model}',
   'chat.hint': 'اكتب رسالتك ثم Enter · /help للأوامر · Ctrl+C لإيقاف الرد أو الخروج',
   'chat.thinking': 'يفكّر…',
+  'chat.thinking': 'يفكّر…',
   'chat.tool.run': '⚙ {summary}',
   'chat.tool.done': '✓ {name} ({ms}ms)',
   'chat.tool.error': '✖ {name}: {error}',

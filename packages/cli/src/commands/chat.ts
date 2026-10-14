@@ -22,6 +22,7 @@ interface ChatOpts {
   yolo?: boolean;
   cwd?: string;
   quiet?: boolean;
+  showReasoning?: boolean;
 }
 
 const APPROVAL_MODES: ApprovalMode[] = ['ask', 'allowlist', 'yolo'];
@@ -71,6 +72,7 @@ export function registerChat(program: Command): void {
     .option('--yolo', 'shortcut for --approval yolo')
     .option('--cwd <dir>', 'working directory for tools (default: current directory)')
     .option('-q, --quiet', 'hide tool output previews')
+    .option('--show-reasoning', "stream the model's thinking text (hidden by default)")
     .action(async (words: string[], opts: ChatOpts, cmd: Command) => {
       const g = cmd.optsWithGlobals<{ home?: string; lang?: string }>();
       const app = await bootstrap({ home: g.home, lang: g.lang });
@@ -125,7 +127,10 @@ async function runOneShot(app: App, message: string, opts: ChatOpts): Promise<nu
   const cwd = opts.cwd ?? process.cwd();
   const { session } = pickSession(app, opts, cwd);
   const policy = createPolicyState(resolveApproval(app, opts, session), app.config.agent.allowlist);
-  const view = createChatView(app.lang, process.stdout, { quiet: opts.quiet });
+  const view = createChatView(app.lang, process.stdout, {
+    quiet: opts.quiet,
+    reasoning: opts.showReasoning,
+  });
   const ac = new AbortController();
   process.once('SIGINT', () => ac.abort());
   try {
@@ -183,7 +188,10 @@ async function runInteractive(app: App, opts: ChatOpts): Promise<number> {
   let { session, resumed } = pickSession(app, opts, cwd);
   let modelRef = opts.model;
   const policy = createPolicyState(resolveApproval(app, opts, session), app.config.agent.allowlist);
-  const view = createChatView(app.lang, process.stdout, { quiet: opts.quiet });
+  const view = createChatView(app.lang, process.stdout, {
+    quiet: opts.quiet,
+    reasoning: opts.showReasoning,
+  });
   const out = (s: string) => process.stdout.write(`${s}\n`);
   const dim = (s: string) => (process.stdout.isTTY ? pc.dim(s) : s);
 
