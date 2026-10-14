@@ -86,6 +86,11 @@ export const ar = {
   'bg.step.lock.title': 'ثبّت Termux في التطبيقات الأخيرة',
   'bg.step.lock.body':
     'افتح شاشة التطبيقات الأخيرة (□) ← اسحب بطاقة Termux للأسفل قليلاً حتى يظهر قفل 🔒 ← اضغطه. ولا تُزل إشعار Termux الدائم.',
+  'doctor.gateway.down': 'العقل (الخادم المحلي) غير مشغّل الآن — للتشغيل: sindar gateway start',
+  'doctor.gateway.ok': 'العقل يعمل على {url} بالنسخة الحالية ({build})',
+  'doctor.gateway.stale':
+    'العقل يعمل على {url} لكن بنسخة قديمة ({build}) بينما المثبتة {installed}',
+  'doctor.gateway.stale.hint': 'أعد تشغيله ليأخذ التحديث: sindar gateway restart',
   'doctor.resources': 'الذاكرة: {freeMem} متاحة من {totalMem} · القرص: {freeDisk} متاح',
   'doctor.resources.lowmem':
     'الذاكرة المتاحة قليلة ({freeMem}) — فضّل مزوداً سحابياً مجانياً بدل نموذج محلي',
@@ -101,10 +106,10 @@ export const ar = {
     'تنبيه: الإصدار المنشور الآن هو {build} لكن المثبت مختلف. جرّب بعد قليل: sindar update --force',
   'update.gateway.down': 'العقل غير مشغّل الآن. لتشغيله: sindar gateway start',
   'update.gateway.current': 'العقل يعمل بالنسخة الجديدة ✓',
-  'update.gateway.restarting': 'العقل ما زال يعمل بالنسخة القديمة — أعيد تشغيله…',
+  'update.gateway.restarting': 'العقل ما زال يعمل بالنسخة القديمة ({build}) — أعيد تشغيله…',
   'update.gateway.restarted': 'أعيد تشغيل العقل بالنسخة الجديدة ✓ ({build})',
   'update.gateway.failed':
-    'لم أستطع إعادة تشغيل العقل تلقائيًا. أوقفه ثم شغّله: sindar gateway stop ثم sindar gateway start',
+    'لم أستطع إعادة تشغيل العقل تلقائياً. أغلق Termux تماماً (زر Exit في إشعار Termux) ثم افتحه وشغّل: sindar gateway start',
   'update.fail': 'فشل التحديث: {error}',
   'update.npm.missing': 'npm غير موجود في المسار',
   'cli.hint':
@@ -227,7 +232,9 @@ export const ar = {
   'gateway.stopping': 'جارٍ الإيقاف…',
   'gateway.stopped': 'توقف خادم SINDAR.',
   'gateway.stop.foreign':
-    'الخادم يعمل لكن لم أستطع إيقافه (ربما نسخة قديمة في نافذة أخرى) — أوقفه بـ Ctrl+C هناك ثم أعد المحاولة.',
+    'الخادم يعمل لكن لم أستطع إيقافه. أغلق Termux تماماً (زر Exit في إشعار Termux) ثم افتحه وشغّل: sindar gateway start',
+  'gateway.stop.orphan':
+    'وجدت عقلاً قديماً يعمل بلا ملف pid (العملية {pid}، النسخة {build}) — أوقفته.',
   'gateway.start.failed': 'لم يبدأ الخادم. انظر السجل: {log}',
   'gateway.status.up': 'يعمل ✓ {url} (منذ {uptime})',
   'gateway.status.detail':

@@ -736,6 +736,8 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
   // ---- status -----------------------------------------------------------
   app.get('/api/status', (c) =>
     c.json({
+      pid: process.pid,
+      build: BUILD,
       running: manager.runningSessions(),
       pending: manager.pendingApprovals(),
       clients: sockets.size,

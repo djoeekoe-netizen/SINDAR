@@ -13,6 +13,14 @@ import { BUILD, MIN_NODE, VERSION, nodeVersionOk } from '../version.js';
 
 export type CheckStatus = 'ok' | 'warn' | 'fail' | 'info';
 
+/** Two build ids (git SHAs, possibly abbreviated) refer to the same commit. */
+export function sameBuild(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const n = Math.min(a.length, b.length, 40);
+  return n >= 7 && a.slice(0, n).toLowerCase() === b.slice(0, n).toLowerCase();
+}
+
 export interface CheckResult {
   id: string;
   status: CheckStatus;
@@ -41,6 +49,8 @@ export interface DoctorOptions {
   /** Probe local servers (Ollama etc.) over HTTP. Default true. */
   probeLocal?: boolean;
   probeTimeoutMs?: number;
+  /** Check whether the local gateway (brain) is running and on this build. Default true. */
+  probeGateway?: boolean;
 }
 
 async function probeUrl(url: string, timeoutMs: number): Promise<boolean> {
@@ -271,7 +281,35 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
     });
   }
 
-  // 6. Resources
+  // 6. The brain (gateway): running? and on the same build as this CLI?
+  if (loaded && opts.probeGateway !== false) {
+    const g = loaded.config.gateway;
+    const host = g.host === '0.0.0.0' || g.host === '::' ? '127.0.0.1' : g.host;
+    const url = `http://${host}:${g.port}`;
+    let health: { version?: string; build?: string } | undefined;
+    try {
+      const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(probeTimeout) });
+      if (res.ok) health = (await res.json()) as { version?: string; build?: string };
+    } catch {
+      /* not running */
+    }
+    if (!health) {
+      checks.push({ id: 'gateway', status: 'info', title: T('doctor.gateway.down') });
+    } else {
+      const build = (health.build ?? '?').slice(0, 7);
+      const same = sameBuild(health.build, BUILD);
+      checks.push({
+        id: 'gateway',
+        status: same ? 'ok' : 'warn',
+        title: same
+          ? T('doctor.gateway.ok', { url, build })
+          : T('doctor.gateway.stale', { url, build, installed: BUILD.slice(0, 7) }),
+        hint: same ? undefined : T('doctor.gateway.stale.hint'),
+      });
+    }
+  }
+
+  // 7. Resources
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const free = await diskFree(loaded?.paths.home ?? platform.home);

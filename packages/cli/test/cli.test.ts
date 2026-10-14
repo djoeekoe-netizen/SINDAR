@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import net from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,7 +53,8 @@ describe('dependency sync (bundle contract)', () => {
   it('update: compares builds, parses --version output and tolerates offline release info', async () => {
     expect(sameBuild('4271e31', '4271e31abcdef0123456789abcdef0123456789a')).toBe(true);
     expect(sameBuild('4271e31', '4271e32')).toBe(false);
-    expect(sameBuild('local', 'local')).toBe(false); // too short to mean anything
+    expect(sameBuild('local', 'local')).toBe(true); // identical strings always match
+    expect(sameBuild('abc', 'abcdef0')).toBe(false); // too short to mean anything
     expect(sameBuild(undefined, 'abc')).toBe(false);
     expect(parseVersionOutput('0.1.0 (4271e31)\n')).toEqual({ version: '0.1.0', build: '4271e31' });
     expect(parseVersionOutput('garbage')).toBeUndefined();
@@ -170,6 +172,68 @@ describe.skipIf(!hasBuild)('built binary', () => {
     }
   });
 });
+
+describe.skipIf(!hasBuild || process.platform === 'win32')(
+  'gateway stop finds orphan brains',
+  () => {
+    const freePort = () =>
+      new Promise<number>((resolve) => {
+        const srv = net.createServer();
+        srv.listen(0, '127.0.0.1', () => {
+          const { port } = srv.address() as net.AddressInfo;
+          srv.close(() => resolve(port));
+        });
+      });
+
+    it('stops an old `gateway run` that has no pid file and no shutdown endpoint', async () => {
+      const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-cli-orphan-'));
+      const port = await freePort();
+      fs.writeFileSync(path.join(home, 'config.yaml'), `gateway:\n  port: ${port}\n`);
+      // A stand-in for a pre-30b7a8a brain: answers /health, 404s everything else, no pid file.
+      const fakeDir = path.join(home, 'sindar-old', 'dist');
+      fs.mkdirSync(fakeDir, { recursive: true });
+      const fake = path.join(fakeDir, 'index.js');
+      fs.writeFileSync(
+        fake,
+        `const http = require('node:http');
+const srv = http.createServer((req, res) => {
+  if (req.url === '/health') return res.end(JSON.stringify({ ok: true, name: 'sindar', version: '0.0.1', build: 'deadbeefcafe', uptimeS: 1, model: 'mock:echo', sessions: 0, running: 0, pending: 0, platform: { os: 'linux', isTermux: false } }));
+  res.statusCode = 404; res.end('{}');
+});
+srv.listen(${port}, '127.0.0.1', () => console.log('up'));
+process.on('SIGTERM', () => srv.close(() => process.exit(0)));`,
+      );
+      let child: ChildProcess | undefined;
+      try {
+        child = spawn(process.execPath, [fake, '--home', home, 'gateway', 'run'], {
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        await new Promise<void>((resolve) => child!.stdout!.once('data', () => resolve()));
+        const exited = new Promise<number | null>((resolve) =>
+          child!.once('exit', (c) => resolve(c)),
+        );
+
+        const status = run(['--lang', 'en', 'gateway', 'status'], { SINDAR_HOME: home });
+        expect(status.stdout).toContain('running');
+        expect(status.stdout).toContain('deadbee');
+
+        const stop = run(['--lang', 'en', 'gateway', 'stop'], { SINDAR_HOME: home });
+        expect(stop.stdout).toContain(`process ${child.pid}`);
+        expect(stop.stdout).toContain('stopped');
+        expect(stop.status).toBe(0);
+        await expect(
+          Promise.race([exited, new Promise((r) => setTimeout(() => r('timeout'), 5000))]),
+        ).resolves.not.toBe('timeout');
+        expect(run(['--lang', 'en', 'gateway', 'status'], { SINDAR_HOME: home }).stdout).toContain(
+          'not running',
+        );
+      } finally {
+        child?.kill('SIGKILL');
+        fs.rmSync(home, { recursive: true, force: true });
+      }
+    }, 30_000);
+  },
+);
 
 describe.skipIf(!hasBuild)('chat / onboard / config (mock provider)', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-cli-m1-'));

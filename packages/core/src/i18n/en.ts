@@ -87,6 +87,12 @@ export const en: Record<keyof typeof ar, string> = {
   'bg.step.lock.title': 'Lock Termux in Recents',
   'bg.step.lock.body':
     'Open Recents (□) → pull the Termux card down a little until a lock 🔒 appears → tap it. Never dismiss the permanent Termux notification.',
+  'doctor.gateway.down':
+    'The brain (local server) is not running — start it with: sindar gateway start',
+  'doctor.gateway.ok': 'The brain is running at {url} on the current build ({build})',
+  'doctor.gateway.stale':
+    'The brain at {url} runs an older build ({build}) while {installed} is installed',
+  'doctor.gateway.stale.hint': 'Restart it to pick up the update: sindar gateway restart',
   'doctor.resources': 'Memory: {freeMem} free of {totalMem} · Disk: {freeDisk} free',
   'doctor.resources.lowmem':
     'Low free memory ({freeMem}) — prefer a free cloud provider over a local model',
@@ -102,10 +108,11 @@ export const en: Record<keyof typeof ar, string> = {
     'Note: the channel now publishes {build} but a different build got installed. Try again shortly: sindar update --force',
   'update.gateway.down': 'The brain is not running. Start it with: sindar gateway start',
   'update.gateway.current': 'The brain is running the new build ✓',
-  'update.gateway.restarting': 'The brain is still running the old build — restarting it…',
+  'update.gateway.restarting':
+    'The brain is still running the old build ({build}) — restarting it…',
   'update.gateway.restarted': 'Brain restarted on the new build ✓ ({build})',
   'update.gateway.failed':
-    'Could not restart the brain automatically. Stop and start it: sindar gateway stop, then sindar gateway start',
+    'Could not restart the brain automatically. Close Termux completely (Exit in the Termux notification), reopen it and run: sindar gateway start',
   'update.fail': 'Update failed: {error}',
   'update.npm.missing': 'npm not found on PATH',
   'cli.hint':
@@ -228,7 +235,9 @@ export const en: Record<keyof typeof ar, string> = {
   'gateway.stopping': 'Stopping…',
   'gateway.stopped': 'SINDAR gateway stopped.',
   'gateway.stop.foreign':
-    'The server is running but I could not stop it (maybe an old build in another window) — press Ctrl+C there, then retry.',
+    'The server is running but I could not stop it. Close Termux completely (Exit in the Termux notification), reopen it and run: sindar gateway start',
+  'gateway.stop.orphan':
+    'Found an older brain running without a pid file (process {pid}, build {build}) — stopped it.',
   'gateway.start.failed': 'The gateway did not start. See the log: {log}',
   'gateway.status.up': 'running ✓ {url} (up {uptime})',
   'gateway.status.detail':

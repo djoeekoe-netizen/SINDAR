@@ -2,9 +2,9 @@ import { spawn, execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import pc from 'picocolors';
-import { BUILD, commandExists, t, isLang, type Lang } from '@sindar/core';
+import { BUILD, commandExists, sameBuild, t, isLang, type Lang } from '@sindar/core';
 import { bootstrap } from '../app.js';
 import { fetchHealth, gatewayUrl, restartGateway } from './gateway.js';
 
@@ -43,12 +43,7 @@ export async function fetchReleaseInfo(
   }
 }
 
-/** Two build ids (git SHAs, possibly abbreviated) refer to the same commit. */
-export function sameBuild(a?: string, b?: string): boolean {
-  if (!a || !b) return false;
-  const n = Math.min(a.length, b.length, 40);
-  return n >= 7 && a.slice(0, n).toLowerCase() === b.slice(0, n).toLowerCase();
-}
+export { sameBuild };
 
 /** Parse the output of `sindar --version` ("0.1.0 (abc1234…)"). */
 export function parseVersionOutput(out: string): { version: string; build: string } | undefined {
@@ -70,9 +65,9 @@ export async function installedBuild(): Promise<{ version: string; build: string
   });
 }
 
-function runNpm(npm: string, args: string[]): Promise<number> {
+function run(cmd: string, args: string[], shell = false): Promise<number> {
   return new Promise<number>((resolve) => {
-    const child = spawn(npm, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+    const child = spawn(cmd, args, { stdio: 'inherit', shell });
     child.on('exit', (c) => resolve(c ?? 1));
     child.on('error', () => resolve(1));
   });
@@ -83,6 +78,53 @@ interface UpdateOpts {
   repo: string;
   force?: boolean;
   restart?: boolean;
+  /** Hidden: second phase, executed by the freshly installed binary. */
+  finish?: boolean;
+}
+
+/**
+ * Phase two of an update: make sure the brain that is running uses the code that is installed.
+ * Runs inside the NEW binary (re-executed after `npm install`), so the newest stop/restart logic
+ * is the one that deals with whatever old gateway is still around.
+ */
+async function finishUpdate(
+  lang: Lang,
+  globals: { home?: string; lang?: string },
+  target: string,
+): Promise<void> {
+  const out = (s: string) => process.stdout.write(`${s}\n`);
+  try {
+    const app = await bootstrap({ home: globals.home, lang: globals.lang });
+    try {
+      const health = await fetchHealth(gatewayUrl(app));
+      if (!health) {
+        out(pc.dim(t(lang, 'update.gateway.down')));
+        return;
+      }
+      if (sameBuild(health.build, target)) {
+        out(pc.green(t(lang, 'update.gateway.current')));
+        return;
+      }
+      out(pc.cyan(t(lang, 'update.gateway.restarting', { build: health.build.slice(0, 7) })));
+      const r = await restartGateway(app, { log: (line) => out(pc.dim(line)) });
+      if (r.ok) {
+        out(
+          pc.green(
+            t(lang, 'update.gateway.restarted', { build: (r.health?.build ?? '?').slice(0, 7) }),
+          ),
+        );
+      } else {
+        out(pc.yellow(t(lang, 'update.gateway.failed')));
+        process.exitCode = 1;
+      }
+    } finally {
+      await app.close();
+    }
+  } catch (err) {
+    out(pc.yellow(t(lang, 'update.gateway.failed')));
+    out(pc.dim((err as Error).message));
+    process.exitCode = 1;
+  }
 }
 
 export function registerUpdate(program: Command): void {
@@ -97,10 +139,15 @@ export function registerUpdate(program: Command): void {
     .option('--repo <owner/name>', 'GitHub repository', process.env.SINDAR_REPO ?? DEFAULT_REPO)
     .option('-f, --force', 'reinstall even when already on the latest build')
     .option('--no-restart', 'do not restart a running brain (gateway) after updating')
+    .addOption(new Option('--finish').hideHelp())
     .action(async (opts: UpdateOpts) => {
       const globals = program.opts<{ lang?: string; home?: string }>();
       const lang: Lang = isLang(globals.lang) ? globals.lang : 'ar';
       const out = (s: string) => process.stdout.write(`${s}\n`);
+      if (opts.finish) {
+        await finishUpdate(lang, globals, BUILD);
+        return;
+      }
       const npm =
         commandExists(process.platform === 'win32' ? 'npm.cmd' : 'npm') ?? commandExists('npm');
       if (!npm) {
@@ -122,14 +169,15 @@ export function registerUpdate(program: Command): void {
       } else {
         out(pc.cyan(t(lang, 'update.start', { channel: opts.channel })) + '\n' + pc.dim(url));
         const base = ['install', '-g', url, '--no-fund', '--no-audit', '--prefer-online'];
-        let code = await runNpm(npm, base);
+        const shell = process.platform === 'win32';
+        let code = await run(npm, base, shell);
         if (code === 0) {
           installed = await installedBuild();
           // npm sometimes serves a cached tarball for the same URL — detect it and refetch cleanly.
           if (release?.sha && installed && !sameBuild(installed.build, release.sha)) {
             out(pc.yellow(t(lang, 'update.retry')));
             const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-npm-'));
-            code = await runNpm(npm, [...base, '--cache', cache]);
+            code = await run(npm, [...base, '--cache', cache], shell);
             if (code === 0) installed = await installedBuild();
             fs.rmSync(cache, { recursive: true, force: true });
           }
@@ -149,41 +197,19 @@ export function registerUpdate(program: Command): void {
           out(pc.yellow(t(lang, 'update.mismatch', { build: release.sha.slice(0, 7) })));
       }
 
-      // The brain keeps the OLD code in memory until it is restarted — do it for the user.
+      // The brain keeps the OLD code in memory until it is restarted — do it for the user, and let
+      // the binary we just installed do it (its stop logic is the newest one).
       if (opts.restart === false) return;
-      try {
-        const app = await bootstrap({ home: globals.home, lang: globals.lang });
-        try {
-          const health = await fetchHealth(gatewayUrl(app));
-          if (!health) {
-            out(pc.dim(t(lang, 'update.gateway.down')));
-            return;
-          }
-          const target = installed?.build ?? release?.sha ?? BUILD;
-          if (sameBuild(health.build, target)) {
-            out(pc.green(t(lang, 'update.gateway.current')));
-            return;
-          }
-          out(pc.cyan(t(lang, 'update.gateway.restarting')));
-          const r = await restartGateway(app);
-          if (r.ok) {
-            out(
-              pc.green(
-                t(lang, 'update.gateway.restarted', {
-                  build: (r.health?.build ?? '?').slice(0, 7),
-                }),
-              ),
-            );
-          } else {
-            out(pc.yellow(t(lang, 'update.gateway.failed')));
-            process.exitCode = 1;
-          }
-        } finally {
-          await app.close();
-        }
-      } catch (err) {
-        out(pc.yellow(t(lang, 'update.gateway.failed')));
-        out(pc.dim((err as Error).message));
+      const entry = process.argv[1];
+      if (installed && entry) {
+        const flags = [
+          ...(globals.home ? ['--home', globals.home] : []),
+          ...(globals.lang ? ['--lang', globals.lang] : []),
+        ];
+        const code = await run(process.execPath, [entry, ...flags, 'update', '--finish']);
+        if (code !== 0) process.exitCode = code;
+        return;
       }
+      await finishUpdate(lang, globals, installed?.build ?? release?.sha ?? BUILD);
     });
 }

@@ -8,6 +8,7 @@ import pc from 'picocolors';
 import { t, type Lang } from '@sindar/core';
 import { createGateway, loadOrCreateToken, rotateToken, type HealthDTO } from '@sindar/gateway';
 import { bootstrap, type App } from '../app.js';
+import { findGatewayProcesses, killAndWait, processAlive } from '../procs.js';
 
 interface GatewayFiles {
   pid: string;
@@ -33,15 +34,6 @@ function readPid(file: string): number | undefined {
     return Number.isFinite(n) && n > 0 ? n : undefined;
   } catch {
     return undefined;
-  }
-}
-
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    return (err as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -248,31 +240,64 @@ export async function ensureGatewayRunning(
   return { url, token, started: true, health };
 }
 
-export async function stopGateway(app: App): Promise<boolean> {
-  const files = gatewayFiles(app.paths.home, app.paths.logs);
-  const pid = readPid(files.pid);
-  const url = gatewayUrl(app);
-  if (pid && processAlive(pid)) {
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {
-      /* ignore */
-    }
-    const deadline = Date.now() + 8000;
-    while (Date.now() < deadline && processAlive(pid)) await new Promise((r) => setTimeout(r, 200));
-    if (processAlive(pid)) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch {
-        /* ignore */
-      }
-    }
+/** pid of the gateway answering at `url` (gateways since build 30b7a8a+ report it on /api/status). */
+async function fetchStatusPid(url: string, token: string): Promise<number | undefined> {
+  try {
+    const res = await fetch(`${url}/api/status`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return undefined;
+    const j = (await res.json()) as { pid?: unknown };
+    return typeof j.pid === 'number' && j.pid > 0 ? j.pid : undefined;
+  } catch {
+    return undefined;
   }
-  if (await fetchHealth(url)) {
-    // Still answering (started by someone else, or the pid file was stale): ask it to quit.
+}
+
+export interface StopOptions {
+  /** Receives human-readable notes (e.g. "stopped an orphan brain, pid N"). */
+  log?: (line: string) => void;
+}
+
+/**
+ * Stop the brain, whoever started it:
+ *  1. the pid we recorded when we spawned it;
+ *  2. the pid it reports on /api/status (new builds) or a polite POST /api/shutdown;
+ *  3. the process table — a `… gateway run` started by the Android app, another terminal or an
+ *     older build that did not write a pid file.
+ * Returns false only when something still answers on the port afterwards.
+ */
+export async function stopGateway(app: App, opts: StopOptions = {}): Promise<boolean> {
+  const files = gatewayFiles(app.paths.home, app.paths.logs);
+  const url = gatewayUrl(app);
+  const killed = new Set<number>();
+  const pid = readPid(files.pid);
+  if (pid && processAlive(pid)) {
+    await killAndWait(pid);
+    killed.add(pid);
+  }
+  let health = await fetchHealth(url);
+  if (health) {
     const token = process.env.SINDAR_GATEWAY_TOKEN ?? loadOrCreateToken(app.paths.home);
-    await requestShutdown(url, token);
-    if (!(await waitForDown(url, 10_000))) return false;
+    const remote = await fetchStatusPid(url, token);
+    if (remote && !killed.has(remote) && processAlive(remote)) {
+      await killAndWait(remote);
+      killed.add(remote);
+    } else if (await requestShutdown(url, token)) {
+      await waitForDown(url, 8000);
+    }
+    health = await fetchHealth(url);
+  }
+  if (health) {
+    const build = health.build.slice(0, 7);
+    for (const proc of findGatewayProcesses(app.paths.home)) {
+      if (killed.has(proc.pid)) continue;
+      opts.log?.(t(app.lang, 'gateway.stop.orphan', { pid: proc.pid, build }));
+      await killAndWait(proc.pid);
+      killed.add(proc.pid);
+    }
+    if (!(await waitForDown(url, 4000))) return false;
   }
   try {
     fs.unlinkSync(files.pid);
@@ -289,10 +314,11 @@ export async function stopGateway(app: App): Promise<boolean> {
  */
 export async function restartGateway(
   app: App,
+  opts: StopOptions = {},
 ): Promise<{ ok: boolean; url: string; token: string; health?: HealthDTO; wasRunning: boolean }> {
   const url = gatewayUrl(app);
   const wasRunning = Boolean(await fetchHealth(url));
-  if (wasRunning && !(await stopGateway(app))) {
+  if (wasRunning && !(await stopGateway(app, opts))) {
     const token = process.env.SINDAR_GATEWAY_TOKEN ?? loadOrCreateToken(app.paths.home);
     return { ok: false, url, token, wasRunning };
   }
@@ -364,10 +390,12 @@ export function registerGateway(program: Command): void {
       const g = cmd.optsWithGlobals<{ home?: string; lang?: string }>();
       const app = await bootstrap({ home: g.home, lang: g.lang });
       try {
-        const ok = await stopGateway(app);
+        const dim = (line: string) => process.stdout.write(`${pc.dim(line)}\n`);
+        const ok = await stopGateway(app, { log: dim });
         process.stdout.write(
           `${ok ? pc.green(t(app.lang, 'gateway.stopped')) : pc.yellow(t(app.lang, 'gateway.stop.foreign'))}\n`,
         );
+        if (!ok) process.exitCode = 1;
       } finally {
         await app.close();
       }
@@ -379,7 +407,8 @@ export function registerGateway(program: Command): void {
       const g = cmd.optsWithGlobals<{ home?: string; lang?: string }>();
       const app = await bootstrap({ home: g.home, lang: g.lang });
       try {
-        const r = await restartGateway(app);
+        const dim = (line: string) => process.stdout.write(`${pc.dim(line)}\n`);
+        const r = await restartGateway(app, { log: dim });
         if (!r.ok) {
           process.stdout.write(`${pc.yellow(t(app.lang, 'gateway.stop.foreign'))}\n`);
           process.exitCode = 1;
