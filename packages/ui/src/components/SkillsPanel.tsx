@@ -57,7 +57,14 @@ export function SkillsPanel() {
           </button>
         </div>
         <div class="modal-body skills">
-          {error && <div class="notice error">{error}</div>}
+          {error && (
+            <div class="notice error">
+              {error}{' '}
+              <button class="btn small" onClick={() => void load()}>
+                {t(l, 'common.retry')}
+              </button>
+            </div>
+          )}
           {view.kind === 'list' && (
             <SkillList
               skills={skills}
@@ -138,6 +145,9 @@ function SkillList(props: {
         ＋ {t(l, 'skills.new')}
       </button>
       <div class="skill-list">
+        {props.busy && props.skills.length === 0 && (
+          <div class="muted small pad">{t(l, 'common.loading')}</div>
+        )}
         {props.skills.length === 0 && !props.busy && (
           <div class="muted small pad">{t(l, 'skills.empty')}</div>
         )}

@@ -77,6 +77,7 @@ export function MemoryPanel() {
               </button>
             ))}
           </div>
+          {!file && busy && <div class="muted small">{t(l, 'common.loading')}</div>}
           {file && (
             <div class="muted small memory-stats" dir="auto">
               {file.limit
@@ -98,7 +99,14 @@ export function MemoryPanel() {
             placeholder={t(l, `memory.hint.${tab}` as const)}
             onInput={(e) => setDraft({ ...draft, [tab]: (e.target as HTMLTextAreaElement).value })}
           />
-          {error && <div class="notice error">{error}</div>}
+          {error && (
+            <div class="notice error">
+              {error}{' '}
+              <button class="btn small" onClick={() => void load()}>
+                {t(l, 'common.retry')}
+              </button>
+            </div>
+          )}
           <div class="actions">
             <button class="btn primary" onClick={() => void save()} disabled={busy || !dirty}>
               {t(l, 'memory.save')}
