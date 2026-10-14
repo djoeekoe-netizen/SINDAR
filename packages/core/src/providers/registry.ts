@@ -56,6 +56,36 @@ export function guessContextWindow(model: string, fallback = 32_000): number {
   return fallback;
 }
 
+/**
+ * Per-request token caps that free tiers enforce on top of the context window
+ * (Groq "tokens per minute": a single request above it is rejected with HTTP 413).
+ * Starting points only — the real limit is learned from the provider's error text.
+ */
+const INPUT_BUDGETS: Array<[provider: RegExp, model: RegExp, tokens: number]> = [
+  [/^groq$/i, /gpt-oss/i, 8_000],
+  [/^groq$/i, /llama-3\.3-70b/i, 12_000],
+  [/^groq$/i, /llama-3\.1-8b/i, 6_000],
+  [/^groq$/i, /llama-4-scout/i, 30_000],
+  [/^groq$/i, /llama-4-maverick|qwen3|deepseek|allam/i, 6_000],
+  [/^groq$/i, /kimi-k2/i, 10_000],
+  [/^groq$/i, /gemma/i, 15_000],
+  [/^groq$/i, /compound/i, 70_000],
+  [/^groq$/i, /.*/, 8_000],
+];
+
+export function guessInputBudget(providerId: string, model: string): number | undefined {
+  for (const [p, m, n] of INPUT_BUDGETS) if (p.test(providerId) && m.test(model)) return n;
+  return undefined;
+}
+
+/** What the loop may spend on one request for a model: budget + how far off our token estimate is. */
+export interface RequestBudget {
+  /** Hard cap for one request in provider-counted tokens, or undefined when only the context window applies. */
+  tokens?: number;
+  /** Multiply our rough estimate by this to approximate the provider's count (learned from usage). */
+  scale: number;
+}
+
 /** Resolves `provider:model` refs into live Provider instances (cached per provider id). */
 export class ProviderRegistry {
   private readonly cache = new Map<string, Provider>();
@@ -149,5 +179,54 @@ export class ProviderRegistry {
 
   contextWindow(model: string): number {
     return guessContextWindow(model, this.config.agent.contextWindow ?? 32_000);
+  }
+
+  private readonly learnedBudgets = new Map<string, number>();
+  private readonly scales = new Map<string, number>();
+
+  /** Per-request cap for `provider:model` (config override > learned from errors > known free tiers). */
+  budget(ref: string): RequestBudget {
+    const { provider: providerId = '', model } = parseModelRef(ref);
+    const learned = this.learnedBudgets.get(ref);
+    const configured = this.config.agent.inputBudget;
+    const guessed = guessInputBudget(providerId, model);
+    const tokens =
+      learned !== undefined
+        ? configured !== undefined
+          ? Math.min(learned, configured)
+          : learned
+        : (configured ?? guessed);
+    return { tokens, scale: this.scales.get(ref) ?? 1 };
+  }
+
+  /**
+   * The provider rejected a request as too large: remember a cap below what it quoted
+   * (or 80% of what we sent when it did not say). Returns the new cap.
+   */
+  noteTooLarge(
+    ref: string,
+    limit: number | undefined,
+    requested: number | undefined,
+    estimated: number,
+  ): number {
+    if (requested && estimated > 0) this.noteScale(ref, requested / estimated);
+    const current = this.budget(ref).tokens;
+    let cap = limit ? Math.floor(limit * 0.9) : Math.floor((requested ?? estimated) * 0.8);
+    if (current !== undefined && current <= cap) cap = Math.floor(current * 0.8);
+    cap = Math.max(1_000, cap);
+    this.learnedBudgets.set(ref, cap);
+    return cap;
+  }
+
+  /** Calibrate the estimate from a real `prompt_tokens` count (exponential moving average). */
+  calibrate(ref: string, estimated: number, actual: number): void {
+    if (!(estimated > 0) || !(actual > 0)) return;
+    this.noteScale(ref, actual / estimated);
+  }
+
+  private noteScale(ref: string, ratio: number): void {
+    const clamped = Math.min(4, Math.max(0.4, ratio));
+    const prev = this.scales.get(ref);
+    this.scales.set(ref, prev === undefined ? clamped : prev * 0.5 + clamped * 0.5);
   }
 }

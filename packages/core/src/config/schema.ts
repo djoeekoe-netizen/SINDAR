@@ -67,6 +67,12 @@ export const ConfigSchema = z.object({
         ]),
       /** Context window override when the model is unknown (tokens). */
       contextWindow: z.number().int().positive().optional(),
+      /**
+       * Max tokens per single request (prompt + tools). Free tiers cap this far below the
+       * context window (Groq: 6–12k "tokens per minute"); SINDAR learns the real limit from the
+       * provider's errors, this just sets the starting point. Raise it on a paid plan.
+       */
+      inputBudget: z.number().int().positive().optional(),
       /** Tool output beyond this is truncated (full output saved to a file). */
       maxToolOutputChars: z.number().int().positive().default(16_000),
       toolTimeoutS: z.number().int().positive().max(3600).default(120),

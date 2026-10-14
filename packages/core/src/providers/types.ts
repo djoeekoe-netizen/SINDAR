@@ -55,11 +55,23 @@ export interface Usage {
 export type FinishReason = 'stop' | 'tool_calls' | 'length' | 'error' | 'cancelled';
 
 export type ProviderErrorCode =
-  'auth' | 'rate_limit' | 'network' | 'invalid_request' | 'not_found' | 'server' | 'unknown';
+  | 'auth'
+  | 'rate_limit'
+  | 'network'
+  | 'invalid_request'
+  | 'not_found'
+  | 'server'
+  /** The request alone exceeds what the model/tier accepts (HTTP 413, context_length_exceeded…). */
+  | 'too_large'
+  | 'unknown';
 
 export class ProviderError extends Error {
   /** Suggested wait before retrying (from Retry-After or the error text), in ms. */
   retryAfterMs?: number;
+  /** For `too_large`: the limit the provider quoted (tokens), when it said so. */
+  limitTokens?: number;
+  /** For `too_large`: how many tokens the provider counted in our request, when it said so. */
+  requestedTokens?: number;
   constructor(
     message: string,
     public readonly code: ProviderErrorCode = 'unknown',

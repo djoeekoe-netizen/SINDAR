@@ -24,9 +24,44 @@ export function codeForStatus(status: number): ProviderErrorCode {
   if (status === 401 || status === 403) return 'auth';
   if (status === 429) return 'rate_limit';
   if (status === 404) return 'not_found';
-  if (status === 400 || status === 422 || status === 413) return 'invalid_request';
+  if (status === 413) return 'too_large';
+  if (status === 400 || status === 422) return 'invalid_request';
   if (status >= 500) return 'server';
   return 'unknown';
+}
+
+/**
+ * Does this error text say that the request itself is too big? Covers Groq's 413
+ * ("Request too large … tokens per minute (TPM): Limit 8000, Requested 11818"), OpenAI's
+ * `context_length_exceeded` ("maximum context length is 8192 tokens. However, you requested
+ * 9000 tokens"), Anthropic's "prompt is too long: 210000 tokens > 200000 maximum" and friends.
+ */
+export function isTooLargeMessage(text: string): boolean {
+  return /request too large|too (?:large|long)|context[_ ]length|maximum context|exceeds? the (?:maximum|model)|too many tokens|reduce (?:the length of )?(?:your|the) (?:message|prompt|input)|input is too long|prompt is too long/i.test(
+    text,
+  );
+}
+
+/** Pull "Limit N" / "Requested N" style numbers (tokens) out of a too-large error text. */
+export function parseTokenLimits(text: string): { limit?: number; requested?: number } {
+  const num = (re: RegExp) => {
+    const m = re.exec(text);
+    return m ? Number.parseInt(m[1]!.replace(/[,_]/g, ''), 10) : undefined;
+  };
+  const limit =
+    num(/limit:?\s*([\d,_]+)/i) ??
+    num(/maximum context length is\s*([\d,_]+)/i) ??
+    num(/([\d,_]+)\s*maximum/i) ??
+    num(/(?:max(?:imum)?|limit) of\s*([\d,_]+)\s*tokens/i);
+  const requested =
+    num(/requested:?\s*([\d,_]+)/i) ??
+    num(/you requested\s*([\d,_]+)/i) ??
+    num(/(?:prompt|input|messages?) (?:is|are|resulted in)\s*([\d,_]+)\s*tokens/i) ??
+    num(/([\d,_]+)\s*tokens\s*>/i);
+  return {
+    limit: limit && Number.isFinite(limit) ? limit : undefined,
+    requested: requested && Number.isFinite(requested) ? requested : undefined,
+  };
 }
 
 export async function httpError(res: Response, provider: string): Promise<ProviderError> {
@@ -36,11 +71,22 @@ export async function httpError(res: Response, provider: string): Promise<Provid
   } catch {
     /* ignore */
   }
-  const code = codeForStatus(res.status);
   const detail = errorMessageFromBody(body);
+  const text = detail || body;
+  // Groq reports an oversized single request as 413; others as 400 with a telling message.
+  // A 429 whose text says the *request* is too large is also hopeless to retry unchanged.
+  const tooLarge =
+    res.status === 413 ||
+    ((res.status === 400 || res.status === 422 || res.status === 429) && isTooLargeMessage(text));
+  const code = tooLarge ? 'too_large' : codeForStatus(res.status);
   const prefix = `${provider}: HTTP ${res.status}`;
   const err = new ProviderError(detail ? `${prefix} — ${detail}` : prefix, code, res.status);
-  const wait = parseRetryAfter(res.headers.get('retry-after'), detail || body);
+  if (tooLarge) {
+    const { limit, requested } = parseTokenLimits(text);
+    err.limitTokens = limit;
+    err.requestedTokens = requested;
+  }
+  const wait = parseRetryAfter(res.headers.get('retry-after'), text);
   if (wait !== undefined) err.retryAfterMs = wait;
   return err;
 }

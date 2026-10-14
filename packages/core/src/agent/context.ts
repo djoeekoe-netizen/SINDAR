@@ -51,10 +51,21 @@ export function ensureIdentityFiles(paths: SindarPaths): string[] {
   return created;
 }
 
-function readCapped(file: string, maxChars: number): string | undefined {
+function readCapped(
+  file: string,
+  maxChars: number,
+  keep: 'head' | 'tail' = 'head',
+): string | undefined {
   try {
     const t = fs.readFileSync(file, 'utf8');
-    return t.length > maxChars ? `${t.slice(0, maxChars)}\n…(truncated)` : t;
+    if (t.length <= maxChars) return t;
+    if (keep === 'tail') {
+      // Memory grows at the end: when it must be cut, the newest entries matter most.
+      const nl = t.indexOf('\n');
+      const head = nl > 0 && nl < 200 ? t.slice(0, nl + 1) : '';
+      return `${head}…(older entries omitted)\n${t.slice(t.length - (maxChars - head.length))}`;
+    }
+    return `${t.slice(0, maxChars)}\n…(truncated)`;
   } catch {
     return undefined;
   }
@@ -99,6 +110,12 @@ export interface ContextInput {
   timeZone?: string;
   /** Extra sections appended by later milestones (skills index, memory nudges…). */
   extraSections?: string[];
+  /**
+   * Rough character budget for the whole prompt (from the model's per-request token cap).
+   * Shrinks the identity/memory/project sections proportionally so small free-tier models
+   * (Groq: ~8k tokens per request) keep room for the conversation itself.
+   */
+  charBudget?: number;
 }
 
 export function buildSystemPrompt(input: ContextInput): string {
@@ -107,14 +124,18 @@ export function buildSystemPrompt(input: ContextInput): string {
   const tz = input.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const sections: string[] = [];
 
-  sections.push(readCapped(paths.soul, 8000) ?? DEFAULT_SOUL);
+  const cb = input.charBudget;
+  const capOf = (def: number, share: number) =>
+    cb ? Math.min(def, Math.max(600, Math.floor(cb * share))) : def;
 
-  const user = readCapped(paths.user, 6000);
+  sections.push(readCapped(paths.soul, capOf(8000, 0.15)) ?? DEFAULT_SOUL);
+
+  const user = readCapped(paths.user, capOf(6000, 0.08));
   if (user?.trim()) sections.push(user);
-  const memory = readCapped(paths.memory, 12000);
+  const memory = readCapped(paths.memory, capOf(12000, 0.14), 'tail');
   if (memory?.trim()) sections.push(memory);
 
-  for (const p of findProjectContext(cwd, platform.home))
+  for (const p of findProjectContext(cwd, platform.home, 3, capOf(6000, 0.1)))
     sections.push(`# Project context (${p.file})\n\n${p.content}`);
 
   const os = platform.isTermux
@@ -159,10 +180,14 @@ export function buildSystemPrompt(input: ContextInput): string {
   return sections.join('\n\n---\n\n');
 }
 
-/** Rough token estimate that is pessimistic for Arabic (≈2.5 chars/token) and fine for code. */
+/**
+ * Rough token estimate. Arabic tokenizes badly on most models (measured on Groq/gpt-oss:
+ * ~1.6 chars per token for news prose), Latin prose/code ≈ 3.8. The loop refines this per
+ * model from the provider's real `prompt_tokens` (see ProviderRegistry.calibrate).
+ */
 export function estimateTokens(text: string): number {
   if (!text) return 0;
   const arabic = (text.match(/[\u0600-\u06FF]/g) ?? []).length;
   const other = text.length - arabic;
-  return Math.ceil(arabic / 2.5 + other / 4);
+  return Math.ceil(arabic / 1.7 + other / 3.8);
 }

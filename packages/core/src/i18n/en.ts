@@ -346,6 +346,11 @@ export const en: Record<keyof typeof ar, string> = {
   'app.install.title': 'SINDAR for Android (preview build):',
   'app.install.hint': 'After installing, type in Termux: sindar app connect',
   'app.unknown': 'Unknown action: {action} — use: connect | link | install',
+  // ---- agent loop (request budget) ----
+  'agent.trimmed':
+    'The request exceeded the model limit (~{limit} tokens) — trimmed the context and retried.',
+  'agent.tooLarge':
+    'The request is bigger than this free model allows (~{limit} tokens) even after trimming. Try a shorter message, start a new chat, or pick a model with a higher limit from ☰ → Model.',
   'common.yes': 'yes',
   'common.no': 'no',
   'common.cancelled': 'cancelled',

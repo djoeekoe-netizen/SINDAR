@@ -344,6 +344,10 @@ export const ar = {
   'app.install.title': 'تطبيق SINDAR لأندرويد (نسخة تجريبية):',
   'app.install.hint': 'بعد التثبيت اكتب في Termux: sindar app connect',
   'app.unknown': 'أمر غير معروف: {action} — المتاح: connect | link | install',
+  // ---- agent loop (request budget) ----
+  'agent.trimmed': 'الطلب كان أكبر من حد النموذج (~{limit} توكن) — اختصرتُ السياق وأعدتُ المحاولة.',
+  'agent.tooLarge':
+    'الطلب أكبر من حد النموذج المجاني (~{limit} توكن) حتى بعد الاختصار. جرّب رسالة أقصر، أو ابدأ محادثة جديدة، أو اختر نموذجاً بحدّ أكبر من ☰ ← النموذج.',
   'common.yes': 'نعم',
   'common.no': 'لا',
   'common.cancelled': 'أُلغي',

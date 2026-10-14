@@ -11,7 +11,10 @@ export interface MockTurn {
   toolCalls?: ToolCall[];
   usage?: Usage;
   /** Simulate a provider failure for this turn. */
-  error?: { message: string; code?: 'auth' | 'rate_limit' | 'network' | 'server' };
+  error?: {
+    message: string;
+    code?: 'auth' | 'rate_limit' | 'network' | 'server' | 'too_large' | 'invalid_request';
+  };
 }
 
 export interface MockProviderOptions {
@@ -60,10 +63,15 @@ export function createMockProvider(opts: MockProviderOptions = {}): MockProvider
 
     if (turn.error) {
       const { ProviderError } = await import('./types.js');
-      const { parseRetryAfter } = await import('./http.js');
+      const { parseRetryAfter, parseTokenLimits } = await import('./http.js');
       const error = new ProviderError(turn.error.message, turn.error.code ?? 'server');
       const wait = parseRetryAfter(null, turn.error.message);
       if (wait !== undefined) error.retryAfterMs = wait;
+      if (error.code === 'too_large') {
+        const { limit, requested } = parseTokenLimits(turn.error.message);
+        error.limitTokens = limit;
+        error.requestedTokens = requested;
+      }
       yield { type: 'error', error };
       yield { type: 'done', finishReason: 'error' };
       return;

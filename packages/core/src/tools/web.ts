@@ -100,6 +100,12 @@ export const webFetch = defineTool({
       .max(100_000)
       .optional()
       .describe('Trim the result (default 12000)'),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Skip this many characters of the page text first (to read the next part)'),
   }),
   summarize: (a) => `fetch ${a.url}`,
   classify: networkRisk,
@@ -138,11 +144,16 @@ export const webFetch = defineTool({
         body = conv.text;
         title = conv.title;
       } else body = raw;
+      const offset = Math.min(args.offset ?? 0, body.length);
+      const part = body.slice(offset, offset + max);
+      const rest = body.length - offset - part.length;
       const trimmed =
-        body.length > max ? `${body.slice(0, max)}\n…[trimmed ${body.length - max} chars]` : body;
+        rest > 0
+          ? `${part}\n…[${rest} more chars — call web_fetch again with offset=${offset + part.length} to continue]`
+          : part;
       return {
-        content: `${title ? `# ${title}\n` : ''}URL: ${res.url}\n\n${trimmed}`,
-        meta: { url: res.url, title, chars: body.length },
+        content: `${title ? `# ${title}\n` : ''}URL: ${res.url}${offset ? ` (from char ${offset})` : ''}\n\n${trimmed}`,
+        meta: { url: res.url, title, chars: body.length, offset },
       };
     } catch (err) {
       const msg = ctl.signal.aborted ? 'timeout/cancelled' : (err as Error).message;

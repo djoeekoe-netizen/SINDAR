@@ -17,6 +17,8 @@ import {
 } from '../providers/types.js';
 import type { Tool, ToolContext, ToolRegistry, ToolResult } from '../tools/types.js';
 import { buildSystemPrompt, estimateTokens } from './context.js';
+import { fitToBudget, totalTokens } from './budget.js';
+import { t } from '../i18n/index.js';
 import { contentToText, type Session, type SessionStore, type StoredMessage } from './sessions.js';
 import { MemoryFiles } from '../memory/index.js';
 import { SkillStore } from '../skills/index.js';
@@ -102,13 +104,11 @@ function toChatMessages(history: StoredMessage[]): ChatMessage[] {
 }
 
 function approxTokens(messages: ChatMessage[]): number {
-  let n = 0;
-  for (const m of messages) {
-    n += estimateTokens(contentToText(m.content)) + 4;
-    if (m.toolCalls) n += estimateTokens(JSON.stringify(m.toolCalls));
-  }
-  return n;
+  return totalTokens(messages, estimateTokens);
 }
+
+/** Tokens the provider will count on top of the messages: tool schemas + room for the answer. */
+const OUTPUT_RESERVE_TOKENS = 1_000;
 
 /** Drop orphaned tool messages / dangling tool calls at the cut point so providers accept the history. */
 function sanitize(messages: ChatMessage[]): ChatMessage[] {
@@ -186,7 +186,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     sessions: store,
     skillsMode: config.skills.autoCreate,
   };
-  const toolNames = new Set(tools.list().map((t) => t.name));
+  const toolNames = new Set(tools.list().map((tool) => tool.name));
 
   const candidates = registry.candidates(opts.modelRef ?? session.model ?? undefined);
   let targetIdx = 0;
@@ -218,6 +218,39 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
   let skillTouched = false;
   const maxIterations = config.agent.maxIterations;
   const toolDefs = tools.definitions();
+  const toolDefTokens = toolDefs.length ? estimateTokens(JSON.stringify(toolDefs)) : 0;
+
+  /**
+   * Shrink the outgoing copy of the conversation to the model's per-request cap (free tiers
+   * reject single requests above ~6–12k tokens). Uses the calibrated estimate for this model.
+   */
+  const fitRequest = (messages: ChatMessage[]): ChatMessage[] => {
+    const { tokens: cap, scale } = registry.budget(target.ref);
+    if (!cap) return messages;
+    const estimate = (text: string) => Math.ceil(estimateTokens(text) * scale);
+    const allowed =
+      Math.floor(cap * 0.95) - Math.ceil(toolDefTokens * scale) - OUTPUT_RESERVE_TOKENS;
+    const fit = fitToBudget(messages, Math.max(600, allowed), { estimate });
+    if (fit.actions.length) {
+      rt.logger.debug('request trimmed to budget', {
+        model: target.ref,
+        cap,
+        scale: Number(scale.toFixed(2)),
+        tokens: fit.tokens,
+        actions: fit.actions,
+      });
+    }
+    return fit.messages;
+  };
+  /** Our estimate of what we are about to send (messages + tool schemas), unscaled. */
+  const requestEstimate = (messages: ChatMessage[]): number =>
+    approxTokens(messages) + toolDefTokens;
+
+  /** Characters the prompt may use on this model (≈2.2 chars/token, Arabic-weighted). */
+  const charBudget = (): number | undefined => {
+    const { tokens: cap } = registry.budget(target.ref);
+    return cap ? Math.floor(cap * 2.2) : undefined;
+  };
 
   const systemPrompt = () =>
     buildSystemPrompt({
@@ -229,6 +262,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       workspace,
       tools: tools.list(),
       approvalMode: opts.policy.mode,
+      charBudget: charBudget(),
       extraSections: [
         ...learningSections({
           config,
@@ -264,8 +298,12 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
 
   const maybeCompress = async (messages: ChatMessage[]): Promise<ChatMessage[]> => {
     const window = registry.contextWindow(target.model);
+    const { tokens: cap, scale } = registry.budget(target.ref);
+    // Summarize when the history nears the context window — or, on capped free tiers, the
+    // per-request cap, so old rounds become a durable summary instead of being dropped.
+    const limit = Math.min(window, cap ? Math.floor(cap / scale) : Number.POSITIVE_INFINITY);
     const tokens = approxTokens(messages);
-    if (tokens < window * COMPRESS_RATIO) return messages;
+    if (tokens < limit * COMPRESS_RATIO) return messages;
     const fresh = store.get(session.id)!;
     const all = store.messages(session.id, { afterSeq: fresh.summaryUpto });
     if (all.length <= KEEP_RECENT_MESSAGES + 2) return messages;
@@ -274,10 +312,13 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     while (cut > 0 && all[cut]!.role !== 'user') cut--;
     if (cut <= 0) return messages;
     const old = all.slice(0, cut);
+    // The summary request must fit the same cap: share ~60% of it across the old messages.
+    const transcriptChars = cap ? Math.floor((cap / scale) * 2.2 * 0.6) : 60_000;
+    const perMessage = Math.min(2000, Math.max(200, Math.floor(transcriptChars / old.length)));
     const transcript = old
       .map(
         (m) =>
-          `${m.role}${m.name ? `(${m.name})` : ''}: ${contentToText(m.content).slice(0, 2000)}${m.toolCalls ? ` [tool calls: ${m.toolCalls.map((c) => c.name).join(', ')}]` : ''}`,
+          `${m.role}${m.name ? `(${m.name})` : ''}: ${contentToText(m.content).slice(0, perMessage)}${m.toolCalls ? ` [tool calls: ${m.toolCalls.map((c) => c.name).join(', ')}]` : ''}`,
       )
       .join('\n');
     const prompt = [
@@ -313,6 +354,8 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
   const MAX_WAITS = 3;
   const MAX_WAIT_MS = 45_000;
   let waits = 0;
+  const MAX_SHRINKS = 3;
+  let shrinks = 0;
 
   const switchTarget = (reason: string): boolean => {
     while (++targetIdx < candidates.length) {
@@ -341,7 +384,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       break;
     }
     iterations++;
-    let messages = await maybeCompress(assemble());
+    let messages = fitRequest(await maybeCompress(assemble()));
 
     let text = '';
     const calls: ToolCall[] = [];
@@ -377,6 +420,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
               totalUsage.inputTokens += ev.usage.inputTokens;
               totalUsage.outputTokens += ev.usage.outputTokens;
               store.recordUsage(session.id, target.providerId, target.model, ev.usage);
+              registry.calibrate(target.ref, requestEstimate(messages), ev.usage.inputTokens);
               emit({ type: 'usage', usage: ev.usage, model: target.ref });
               break;
             case 'done':
@@ -399,12 +443,36 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           code: (e as ProviderError).code,
           error: e.message,
         });
+        // The request alone is bigger than the model/tier accepts (Groq 413 "Request too large",
+        // context_length_exceeded…): learn the cap, shrink what we send and try again — same model.
+        if (
+          !streamed &&
+          e instanceof ProviderError &&
+          e.code === 'too_large' &&
+          shrinks < MAX_SHRINKS
+        ) {
+          const before = approxTokens(messages);
+          const cap = registry.noteTooLarge(
+            target.ref,
+            e.limitTokens,
+            e.requestedTokens,
+            requestEstimate(messages),
+          );
+          const smaller = fitRequest(messages);
+          const after = approxTokens(smaller);
+          if (after < before) {
+            shrinks++;
+            messages = smaller;
+            emit({ type: 'notice', message: t(rt.lang, 'agent.trimmed', { limit: cap }) });
+            continue;
+          }
+        }
         // A connection failure (no internet, Termux throttled in the background…) hits every
         // provider alike, so wait for the network first and only then try the fallbacks.
         const isNetwork = (e as ProviderError).code === 'network';
         if (!streamed && !isNetwork && switchTarget(e.message)) {
-          // Re-assemble with the new target's context window in mind.
-          messages = await maybeCompress(assemble());
+          // Re-assemble with the new target's context window and request cap in mind.
+          messages = fitRequest(await maybeCompress(assemble()));
           continue;
         }
         // Nothing left to fall back to: for short rate limits / transient errors, wait and retry.
@@ -426,12 +494,21 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           break;
         }
         if (!streamed && isNetwork && switchTarget(e.message)) {
-          messages = await maybeCompress(assemble());
+          messages = fitRequest(await maybeCompress(assemble()));
           continue;
         }
-        emit({ type: 'error', error: e });
+        const friendly =
+          e instanceof ProviderError && e.code === 'too_large'
+            ? new ProviderError(
+                `${t(rt.lang, 'agent.tooLarge', { limit: e.limitTokens ?? registry.budget(target.ref).tokens ?? '?' })} (${e.message})`,
+                e.code,
+                e.status,
+                false,
+              )
+            : e;
+        emit({ type: 'error', error: friendly });
         if (text) store.append(session.id, { role: 'assistant', content: text });
-        throw new AgentError(e.message, e);
+        throw new AgentError(friendly.message, e);
       }
     }
 
