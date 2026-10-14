@@ -348,6 +348,11 @@ pre {
   scroll-behavior: auto;
   overscroll-behavior: contain;
 }
+/* Items must never shrink to fit the viewport (a fixed-height column flexbox squashes children
+   that have overflow:hidden — tool cards collapsed to 2px lines once the chat got long). */
+.chat > * {
+  flex-shrink: 0;
+}
 .empty {
   margin: auto;
   text-align: center;
@@ -781,6 +786,9 @@ pre {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.session-list > * {
+  flex-shrink: 0;
 }
 .session {
   display: flex;
