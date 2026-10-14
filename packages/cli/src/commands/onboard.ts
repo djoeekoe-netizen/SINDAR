@@ -19,7 +19,7 @@ import { createPrompter, type Prompter } from '../ui/prompt.js';
 
 interface OnboardOpts {
   provider?: string;
-  key?: string;
+  key?: string | true;
   model?: string;
   approval?: string;
   yes?: boolean;
@@ -47,7 +47,7 @@ export function registerOnboard(program: Command): void {
       'guided setup: language, free model provider, API key, default model / الإعداد الأولي',
     )
     .option('--provider <id>', 'skip the menu (groq, gemini, openrouter, ollama, …)')
-    .option('--key <key>', 'API key to save (prefer the interactive prompt)')
+    .option('--key [key]', 'API key to save; without a value the wizard asks for it visibly')
     .option('--model <id>', 'model id (without the provider prefix)')
     .option('--approval <mode>', 'ask | allowlist | yolo')
     .option('-y, --yes', 'accept defaults without prompting')
@@ -124,8 +124,9 @@ export async function onboard(
   const envKey = tpl.apiKeyEnv;
   let resolved: ResolvedProvider = resolveProvider(tpl.id, app.config.providers[tpl.id], app.env)!;
   if (tpl.requiresKey && envKey) {
-    let key = opts.key?.trim();
-    let visible = false;
+    // `--key` without a value (a common slip: Enter pressed before pasting) → ask visibly.
+    let key = typeof opts.key === 'string' ? opts.key.trim() : undefined;
+    let visible = opts.key === true;
     const savedKey = resolved.apiKey;
     for (;;) {
       if (!key) {
