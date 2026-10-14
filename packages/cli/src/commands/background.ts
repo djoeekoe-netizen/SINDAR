@@ -156,10 +156,16 @@ function am(bin: string, args: string[]): Promise<boolean> {
   });
 }
 
-async function openStep(bin: string | undefined, step: Step): Promise<boolean> {
-  if (!bin) return false;
-  for (const intent of step.intents) if (await am(bin, intent)) return true;
-  return false;
+/**
+ * Try the step's screens starting at `from`; resolves the index that Android accepted, or -1.
+ * "Accepted" is not "visible": e.g. the battery dialog closes itself instantly when Termux is
+ * already exempt, and some vendors swallow launches silently — that is why the prompt offers `r`
+ * (try the next screen for the same step).
+ */
+async function openStep(bin: string | undefined, step: Step, from = 0): Promise<number> {
+  if (!bin) return -1;
+  for (let i = from; i < step.intents.length; i++) if (await am(bin, step.intents[i]!)) return i;
+  return -1;
 }
 
 export function registerBackground(program: Command): void {
@@ -197,6 +203,7 @@ export function registerBackground(program: Command): void {
       out();
 
       const ids = stepsFor(device.manufacturer);
+      const huawei = /huawei|honor/i.test(device.manufacturer);
       const amBin = opts.open ? commandExists('am') : undefined;
       const interactive =
         opts.open && Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY);
@@ -221,20 +228,34 @@ export function registerBackground(program: Command): void {
             out();
             continue;
           }
-          const manual = T(pathKey(id));
+          const manual =
+            id === 'battery' && huawei ? T('bg.step.battery.path.huawei') : T(pathKey(id));
           out(pc.dim(T('bg.path', { path: manual })));
           if (amBin) {
             const answer = interactive
               ? (await ask(pc.green(T('bg.open.prompt')))).trim().toLowerCase()
               : '';
             if (answer !== 's' && answer !== 'skip') {
-              const opened = await openStep(amBin, step);
-              out(
-                opened
-                  ? pc.green(T('bg.opened'))
-                  : pc.yellow(T('bg.open.failed', { path: manual })),
-              );
-              if (opened && interactive) await ask(pc.dim(T('bg.back.prompt')));
+              const report = (idx: number) => {
+                if (idx < 0) {
+                  out(pc.yellow(T('bg.open.failed', { path: manual })));
+                  return;
+                }
+                out(pc.green(T('bg.opened')));
+                // The system dialog silently finishes when Termux is already exempt.
+                if (id === 'battery' && idx === 0) out(pc.dim(T('bg.step.battery.note')));
+              };
+              let idx = await openStep(amBin, step);
+              report(idx);
+              if (interactive) {
+                // Wait until the user is back. `r` = "nothing showed up" → next screen for this step.
+                for (;;) {
+                  const back = (await ask(pc.dim(T('bg.back.prompt')))).trim().toLowerCase();
+                  if (back !== 'r' && back !== 'retry') break;
+                  idx = idx < 0 ? -1 : await openStep(amBin, step, idx + 1);
+                  report(idx);
+                }
+              }
             }
           } else if (opts.open) {
             out(pc.yellow(T('bg.open.failed', { path: manual })));

@@ -69,6 +69,31 @@ describe.skipIf(!hasBuild)('built binary', () => {
     expect(termux.stdout).toContain('sindar gateway restart');
   });
 
+  it.skipIf(process.platform === 'win32')('background: Huawei gets its own steps and paths', () => {
+    // Fake `getprop` so the brand detection sees an EMUI phone.
+    const fake = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-fakebin-'));
+    try {
+      const getprop = path.join(fake, 'getprop');
+      fs.writeFileSync(
+        getprop,
+        '#!/bin/sh\ncase "$1" in ro.product.manufacturer) echo HUAWEI;; ro.product.model) echo VOG-L29;; *) echo 10;; esac\n',
+      );
+      fs.chmodSync(getprop, 0o755);
+      const r = run(['--lang', 'en', 'background', '--no-open'], {
+        TERMUX_VERSION: '0.118.0',
+        PREFIX: '/data/data/com.termux/files/usr',
+        PATH: `${fake}${path.delimiter}${process.env['PATH'] ?? ''}`,
+      });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('HUAWEI VOG-L29');
+      expect(r.stdout).toContain('Step 1/5');
+      expect(r.stdout).toContain('Special access');
+      expect(r.stdout).toContain('App launch');
+    } finally {
+      fs.rmSync(fake, { recursive: true, force: true });
+    }
+  });
+
   it('runs doctor with --json in an isolated home and exits 0', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-cli-'));
     try {

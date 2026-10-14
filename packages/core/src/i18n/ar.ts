@@ -50,7 +50,8 @@ export const ar = {
   'bg.step': 'الخطوة {n}/{total}: {title}',
   'bg.path': 'المسار اليدوي: {path}',
   'bg.open.prompt': 'اضغط Enter لفتح شاشة الإعدادات (أو اكتب s للتخطي): ',
-  'bg.back.prompt': 'بعد ضبط الإعداد ارجع إلى Termux واضغط Enter للمتابعة… ',
+  'bg.back.prompt':
+    'بعد ضبط الإعداد ارجع إلى Termux واضغط Enter للمتابعة (لم تظهر أي شاشة؟ اكتب r لتجربة شاشة بديلة): ',
   'bg.opened': 'فُتحت شاشة الإعدادات ✔',
   'bg.open.failed': 'تعذّر فتح الشاشة تلقائياً — افتحها يدوياً: {path}',
   'bg.done':
@@ -58,6 +59,10 @@ export const ar = {
   'bg.step.battery.title': 'إلغاء تحسين البطارية لـ Termux',
   'bg.step.battery.body': 'اختر «السماح» أو «غير مقيّد» (Allow / Unrestricted).',
   'bg.step.battery.path': 'الإعدادات ← التطبيقات ← Termux ← البطارية ← غير مقيّد',
+  'bg.step.battery.path.huawei':
+    'الإعدادات ← التطبيقات ← التطبيقات ← ⋮ ← الوصول الخاص ← تجاهل تحسينات البطارية ← كل التطبيقات ← Termux ← السماح',
+  'bg.step.battery.note':
+    'ℹ️ لم تظهر نافذة؟ غالباً Termux مستثنى من تحسين البطارية مسبقاً. اكتب r لفتح القائمة الكاملة والتأكد، أو اضغط Enter للمتابعة.',
   'bg.step.launch.title': 'السماح لـ Termux بالعمل في الخلفية (تشغيل التطبيق)',
   'bg.step.launch.body':
     'ابحث عن Termux ← أوقف «إدارة تلقائية» ← فعّل الثلاثة: تشغيل تلقائي، تشغيل ثانوي، تشغيل في الخلفية. كرّر الشيء نفسه لـ Termux:API إن وُجد.',

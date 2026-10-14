@@ -51,7 +51,8 @@ export const en: Record<keyof typeof ar, string> = {
   'bg.step': 'Step {n}/{total}: {title}',
   'bg.path': 'Manual path: {path}',
   'bg.open.prompt': 'Press Enter to open the settings screen (or type s to skip): ',
-  'bg.back.prompt': 'When done, come back to Termux and press Enter to continue… ',
+  'bg.back.prompt':
+    'When done, come back to Termux and press Enter (nothing showed up? type r to try another screen): ',
   'bg.opened': 'Settings screen opened ✔',
   'bg.open.failed': 'Could not open the screen automatically — open it manually: {path}',
   'bg.done':
@@ -59,6 +60,10 @@ export const en: Record<keyof typeof ar, string> = {
   'bg.step.battery.title': 'Exempt Termux from battery optimisation',
   'bg.step.battery.body': 'Choose "Allow" / "Unrestricted".',
   'bg.step.battery.path': 'Settings → Apps → Termux → Battery → Unrestricted',
+  'bg.step.battery.path.huawei':
+    'Settings → Apps → Apps → ⋮ → Special access → Ignore battery optimisation → All apps → Termux → Allow',
+  'bg.step.battery.note':
+    'ℹ️ No dialog? Termux is most likely already exempt from battery optimisation. Type r to open the full list and check, or press Enter to continue.',
   'bg.step.launch.title': 'Let Termux run in the background (App launch)',
   'bg.step.launch.body':
     'Find Termux → turn off "Manage automatically" → enable all three: Auto-launch, Secondary launch, Run in background. Do the same for Termux:API if present.',
