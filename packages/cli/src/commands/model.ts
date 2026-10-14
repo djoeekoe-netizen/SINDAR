@@ -25,6 +25,7 @@ export function registerModel(program: Command): void {
               .map((s) => s.trim())
               .filter(Boolean);
             setConfigValue(app.paths.config, 'model.fallbacks', list);
+            app.config.model.fallbacks = list;
             out(
               t(app.lang, 'model.fallbacks', {
                 list: list.join(', ') || t(app.lang, 'model.none'),
