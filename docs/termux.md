@@ -190,7 +190,7 @@ sindar gateway start
    mkdir -p ~/.termux/boot && printf '#!/data/data/com.termux/files/usr/bin/sh\ntermux-wake-lock\nsindar gateway start\n' > ~/.termux/boot/sindar.sh && chmod +x ~/.termux/boot/sindar.sh
    ```
 
-**اختبار القبول لمرحلة M2:** `sindar gateway start` ← تفتح الواجهة وتضيفها للشاشة الرئيسية ← ترسل «اعرض ملفات مجلد test ولخّصها» ← ترى بطاقات الأدوات وتوافق على أمر من الواجهة ← تغلق Termux (من الزر Home لا من «Exit») وتعود للواجهة فتجدها تعمل.
+**اختبار القبول لمرحلة M2 (✔ نجح على الجوال 2026-10-14):** `sindar gateway start` ← تفتح الواجهة وتضيفها للشاشة الرئيسية ← ترسل «أنشئ ملف أفكار.md فيه ثلاث أفكار لمشروع صغير» ← ترى بطاقة الأداة والردّ ← تغلق Termux (من الزر Home لا من «Exit») وتعود للواجهة فتجدها تعمل.
 
 ## 8) ماذا بعد؟
 
