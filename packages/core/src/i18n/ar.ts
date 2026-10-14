@@ -60,6 +60,7 @@ export const ar = {
   'chat.tool.run': '⚙ {summary}',
   'chat.tool.done': '✓ {name} ({ms}ms)',
   'chat.tool.error': '✖ {name}: {error}',
+  'chat.tool.repeat': 'تكرار نفس الأمر — تم تخطيه',
   'chat.tool.denied': '⛔ رُفض: {summary} ({reason})',
   'chat.tool.forbidden': 'ممنوع بقواعد الأمان',
   'chat.approve.title': 'يطلب SINDAR الإذن:',
@@ -121,6 +122,9 @@ export const ar = {
   'onboard.model.title': 'اختر النموذج:',
   'onboard.model.prompt': 'الرقم أو اكتب اسم نموذج [{default}]: ',
   'onboard.model.fetching': 'جارٍ جلب قائمة النماذج…',
+  'onboard.fallbacks': 'نماذج احتياطية عند الازدحام: {models}',
+  'chat.retry.wait':
+    '⏳ الخدمة مزدحمة ({model}) — انتظار {seconds} ثانية ثم إعادة المحاولة ({attempt}/3)…',
   'onboard.saved': 'تم الحفظ: النموذج الافتراضي {model}',
   'onboard.test': 'اختبار سريع…',
   'onboard.test.reply': 'الرد: {text}',

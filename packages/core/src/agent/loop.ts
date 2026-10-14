@@ -39,6 +39,7 @@ export type AgentEvent =
   | { type: 'model_switch'; from: string; to: string; reason: string }
   | { type: 'compress'; beforeTokens: number; afterTokens: number }
   | { type: 'notice'; message: string }
+  | { type: 'retry_wait'; model: string; seconds: number; attempt: number; reason: string }
   | { type: 'done'; finishReason: FinishReason; text: string; iterations: number }
   | { type: 'error'; error: Error };
 
@@ -271,6 +272,10 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     }
   };
 
+  const MAX_WAITS = 3;
+  const MAX_WAIT_MS = 45_000;
+  let waits = 0;
+
   const switchTarget = (reason: string): boolean => {
     while (++targetIdx < candidates.length) {
       try {
@@ -287,6 +292,9 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     }
     return false;
   };
+
+  const MAX_IDENTICAL_CALLS = 2;
+  const repeatCounts = new Map<string, number>();
 
   // 2) The loop.
   while (iterations < maxIterations) {
@@ -358,8 +366,20 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           messages = await maybeCompress(assemble());
           continue;
         }
-        if (retryable && !streamed && targetIdx >= candidates.length - 1) {
-          // Nothing left to fall back to.
+        // Nothing left to fall back to: for short rate limits / transient errors, wait and retry.
+        if (retryable && !streamed && waits < MAX_WAITS) {
+          const hinted = e instanceof ProviderError ? e.retryAfterMs : undefined;
+          const ms = Math.min(MAX_WAIT_MS, hinted !== undefined ? hinted + 500 : 2000 * 2 ** waits);
+          waits++;
+          emit({
+            type: 'retry_wait',
+            model: target.ref,
+            seconds: Math.ceil(ms / 1000),
+            attempt: waits,
+            reason: e.message,
+          });
+          const aborted = await sleep(ms, signal);
+          if (!aborted) continue;
         }
         emit({ type: 'error', error: e });
         if (text) store.append(session.id, { role: 'assistant', content: text });
@@ -415,6 +435,21 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
         continue;
       }
       const { tool, args } = parsed;
+      // Guard against loops: the same tool with identical arguments, over and over.
+      const callKey = `${tool.name}:${JSON.stringify(args)}`;
+      const seen = (repeatCounts.get(callKey) ?? 0) + 1;
+      repeatCounts.set(callKey, seen);
+      if (seen > MAX_IDENTICAL_CALLS) {
+        const content = `error: you already ran ${tool.name} with these exact arguments ${seen - 1} times this turn and got the same result each time. Do not repeat it — use the earlier output (an empty listing means the folder has no visible files), change the arguments, or tell the user what you found.`;
+        emit({
+          type: 'tool_denied',
+          call,
+          summary: tool.summarize?.(args) ?? tool.name,
+          reason: 'repeat',
+        });
+        store.append(session.id, { role: 'tool', content, toolCallId: call.id, name: call.name });
+        continue;
+      }
       const decision = decide(tool, args, toolCtx, opts.policy);
       let allowed = decision.action === 'allow';
       let decidedBy = 'policy';
@@ -505,4 +540,20 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     usage: totalUsage,
     toolCalls: toolCallCount,
   };
+}
+
+/** Resolves true when aborted, false after `ms`. */
+function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(true);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve(false);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }

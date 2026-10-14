@@ -274,3 +274,14 @@ describe('provider registry', () => {
     expect(reg.get('mock').id).toBe('mock');
   });
 });
+
+describe('parseRetryAfter', () => {
+  it('reads seconds, dates and phrases from error text', async () => {
+    const { parseRetryAfter } = await import('../src/providers/http.js');
+    expect(parseRetryAfter('12')).toBe(12_000);
+    expect(parseRetryAfter(null, 'Please try again in 10.9125s. Need more tokens?')).toBe(10_913);
+    expect(parseRetryAfter(null, 'retry after 2 seconds')).toBe(2_000);
+    expect(parseRetryAfter(null, 'try again in 1m30s')).toBe(90_000);
+    expect(parseRetryAfter(null, 'no hint here')).toBeUndefined();
+  });
+});

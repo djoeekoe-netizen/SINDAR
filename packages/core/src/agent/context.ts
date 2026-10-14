@@ -142,7 +142,8 @@ export function buildSystemPrompt(input: ContextInput): string {
         `Available: ${names}.`,
         `- Prefer tools over guessing: read files before editing, run commands to check results.`,
         `- Approval mode is "${input.approvalMode}": risky actions (shell commands, writes outside the workspace) may require the user's confirmation; a denied call returns an error — respect it and suggest an alternative instead of retrying the same call.`,
-        `- Keep tool calls focused; batch independent reads. Long outputs are truncated — ask for ranges.`,
+        `- Keep tool calls focused; batch independent reads. Long outputs are truncated — ask for ranges.
+- Never repeat a tool call with the same arguments: its result is already in the conversation (an empty listing really is empty).`,
         `- When done, summarize what changed and where (paths) in one short message.`,
       ].join('\n'),
     );

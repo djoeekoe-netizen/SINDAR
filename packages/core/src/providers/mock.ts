@@ -60,10 +60,11 @@ export function createMockProvider(opts: MockProviderOptions = {}): MockProvider
 
     if (turn.error) {
       const { ProviderError } = await import('./types.js');
-      yield {
-        type: 'error',
-        error: new ProviderError(turn.error.message, turn.error.code ?? 'server'),
-      };
+      const { parseRetryAfter } = await import('./http.js');
+      const error = new ProviderError(turn.error.message, turn.error.code ?? 'server');
+      const wait = parseRetryAfter(null, turn.error.message);
+      if (wait !== undefined) error.retryAfterMs = wait;
+      yield { type: 'error', error };
       yield { type: 'done', finishReason: 'error' };
       return;
     }

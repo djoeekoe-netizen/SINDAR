@@ -58,6 +58,8 @@ export type ProviderErrorCode =
   'auth' | 'rate_limit' | 'network' | 'invalid_request' | 'not_found' | 'server' | 'unknown';
 
 export class ProviderError extends Error {
+  /** Suggested wait before retrying (from Retry-After or the error text), in ms. */
+  retryAfterMs?: number;
   constructor(
     message: string,
     public readonly code: ProviderErrorCode = 'unknown',

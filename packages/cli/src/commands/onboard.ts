@@ -183,6 +183,7 @@ export async function onboard(
 
   // 4) model
   let model = opts.model;
+  let fallbackPool: string[] = [];
   if (!model) {
     const suggested = tpl.suggestedModels ?? [];
     let remote: string[] = [];
@@ -203,6 +204,7 @@ export async function onboard(
       ]),
     ].slice(0, 25);
     const def = choices[0] ?? suggested[0] ?? '';
+    fallbackPool = suggested.filter((s) => remote.length === 0 || remote.includes(s));
     if (!interactive || choices.length === 0) model = def;
     else {
       out(t(lang, 'onboard.model.title'));
@@ -221,6 +223,15 @@ export async function onboard(
   const ref = `${tpl.id}:${model}`;
   setConfigValue(app.paths.config, 'model.default', ref);
   out(pc.green(t(lang, 'onboard.saved', { model: ref })));
+  // Free tiers rate-limit per model: other free models of the same provider make good fallbacks.
+  const fallbacks = fallbackPool
+    .filter((m) => m !== model)
+    .slice(0, 2)
+    .map((m) => `${tpl.id}:${m}`);
+  if (fallbacks.length) {
+    setConfigValue(app.paths.config, 'model.fallbacks', fallbacks);
+    out(pc.dim(t(lang, 'onboard.fallbacks', { models: fallbacks.join(', ') })));
+  }
 
   // 5) approval mode
   const modes = ['ask', 'allowlist', 'yolo'] as const;

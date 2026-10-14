@@ -209,6 +209,21 @@ export const listDir = defineTool({
       }
     };
     walk(root, args.depth ?? 2, '  ');
+    if (lines.length === 1) {
+      let hiddenCount = 0;
+      try {
+        hiddenCount = fs.readdirSync(root).filter((n) => n.startsWith('.')).length;
+      } catch {
+        /* ignore */
+      }
+      lines.push(
+        hiddenCount && !args.hidden
+          ? `  (no visible files — ${hiddenCount} hidden dot-entries; pass hidden:true to list them)`
+          : '  (empty directory)',
+      );
+    } else {
+      lines.push(`(${count} entries)`);
+    }
     return { content: lines.join('\n') };
   },
 });

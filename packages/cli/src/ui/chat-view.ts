@@ -95,7 +95,11 @@ export function createChatView(
               t(lang, 'chat.tool.denied', {
                 summary: ev.summary,
                 reason:
-                  ev.reason === 'user' ? t(lang, 'common.no') : t(lang, 'chat.tool.forbidden'),
+                  ev.reason === 'user'
+                    ? t(lang, 'common.no')
+                    : ev.reason === 'repeat'
+                      ? t(lang, 'chat.tool.repeat')
+                      : t(lang, 'chat.tool.forbidden'),
               }),
             ),
           );
@@ -118,6 +122,17 @@ export function createChatView(
           break;
         case 'notice':
           status(c.yellow(ev.message));
+          break;
+        case 'retry_wait':
+          status(
+            c.yellow(
+              t(lang, 'chat.retry.wait', {
+                model: ev.model,
+                seconds: ev.seconds,
+                attempt: ev.attempt,
+              }),
+            ),
+          );
           break;
         case 'error':
           status(c.red(t(lang, 'chat.error', { error: ev.error.message })));

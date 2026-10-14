@@ -39,7 +39,33 @@ export async function httpError(res: Response, provider: string): Promise<Provid
   const code = codeForStatus(res.status);
   const detail = errorMessageFromBody(body);
   const prefix = `${provider}: HTTP ${res.status}`;
-  return new ProviderError(detail ? `${prefix} — ${detail}` : prefix, code, res.status);
+  const err = new ProviderError(detail ? `${prefix} — ${detail}` : prefix, code, res.status);
+  const wait = parseRetryAfter(res.headers.get('retry-after'), detail || body);
+  if (wait !== undefined) err.retryAfterMs = wait;
+  return err;
+}
+
+/**
+ * Retry-After header (seconds or HTTP date) or phrases like "try again in 10.9s" /
+ * "retry after 2 seconds" / "in 1m30s" inside the error text → milliseconds.
+ */
+export function parseRetryAfter(header: string | null, text = ''): number | undefined {
+  if (header) {
+    const secs = Number(header);
+    if (Number.isFinite(secs) && secs >= 0) return Math.ceil(secs * 1000);
+    const at = Date.parse(header);
+    if (!Number.isNaN(at)) return Math.max(0, at - Date.now());
+  }
+  const m =
+    /(?:try again|retry)\s*(?:after|in)\s*(?:(\d+)\s*m(?:in(?:ute)?s?)?)?\s*(\d+(?:\.\d+)?)\s*(ms|s|sec(?:ond)?s?)?/i.exec(
+      text,
+    );
+  if (!m) return undefined;
+  const minutes = m[1] ? Number(m[1]) : 0;
+  const n = Number(m[2]);
+  const unit = (m[3] ?? 's').toLowerCase();
+  const ms = unit === 'ms' ? n : n * 1000;
+  return Math.ceil(minutes * 60_000 + ms);
 }
 
 /** Wrap network-level failures (DNS, refused, aborted) into ProviderError. */

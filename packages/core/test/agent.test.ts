@@ -280,3 +280,57 @@ describe('context builder', () => {
     }
   });
 });
+
+describe('loop guards', () => {
+  it('skips the same tool call repeated with identical arguments', async () => {
+    const call = (n: number) => ({
+      text: '',
+      toolCalls: [{ id: `c${n}`, name: 'list_dir', arguments: '{"path":"."}' }],
+    });
+    const looping = createMockProvider({
+      script: [call(1), call(2), call(3), call(4), { text: 'done looping' }],
+    });
+    const rt = await makeRuntime(
+      { model: { default: 'loop:m' }, providers: { loop: { type: 'mock' } } },
+      { instances: { loop: looping } },
+    );
+    try {
+      const session = rt.store.create({ channel: 'cli', cwd: rt.paths.workspace });
+      const { events, onEvent } = collect();
+      const res = await runTurn(rt, { session, input: 'list', policy: policy('yolo'), onEvent });
+      expect(res.text).toBe('done looping');
+      expect(events.filter((e) => e.type === 'tool_start').length).toBe(2);
+      const denied = events.filter((e) => e.type === 'tool_denied');
+      expect(denied.length).toBe(2);
+      expect(denied[0]).toMatchObject({ reason: 'repeat' });
+      const toolMsgs = rt.store.messages(session.id).filter((m) => m.role === 'tool');
+      expect(toolMsgs[0]?.content).toContain('(empty directory)');
+      expect(toolMsgs[2]?.content).toMatch(/already ran list_dir/);
+    } finally {
+      await rt.cleanup();
+    }
+  });
+
+  it('waits and retries on a rate limit when no fallback is left', async () => {
+    const busy = createMockProvider({
+      script: [
+        { error: { message: 'HTTP 429 — try again in 0.01s', code: 'rate_limit' } },
+        { text: 'after wait' },
+      ],
+    });
+    const rt = await makeRuntime(
+      { model: { default: 'busy:m', fallbacks: [] }, providers: { busy: { type: 'mock' } } },
+      { instances: { busy } },
+    );
+    try {
+      const session = rt.store.create({ channel: 'cli' });
+      const { events, onEvent } = collect();
+      const res = await runTurn(rt, { session, input: 'hi', policy: policy(), onEvent });
+      expect(res.text).toBe('after wait');
+      const wait = events.find((e) => e.type === 'retry_wait');
+      expect(wait).toMatchObject({ model: 'busy:m', attempt: 1 });
+    } finally {
+      await rt.cleanup();
+    }
+  });
+});
