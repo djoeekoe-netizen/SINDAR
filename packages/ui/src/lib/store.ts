@@ -3,6 +3,7 @@ import type {
   ApprovalAnswer,
   ApprovalDTO,
   EventDTO,
+  FileRefDTO,
   MessageDTO,
   ModelsDTO,
   PublicConfigDTO,
@@ -44,6 +45,8 @@ export interface ToolItem {
   ms: Signal<number | undefined>;
   truncated: boolean;
   reason?: string;
+  /** Files produced by the tool (download links). */
+  files: Signal<FileRefDTO[]>;
 }
 export interface ApprovalItem {
   kind: 'approval';
@@ -302,6 +305,7 @@ function applyEvent(ev: EventDTO): void {
         progress: signal(''),
         ms: signal<number | undefined>(undefined),
         truncated: false,
+        files: signal<FileRefDTO[]>([]),
       });
       break;
     }
@@ -316,6 +320,7 @@ function applyEvent(ev: EventDTO): void {
       tool.output.value = ev.content;
       tool.ms.value = ev.ms;
       tool.truncated = ev.truncated;
+      if (ev.files?.length) tool.files.value = ev.files;
       tool.status.value = ev.isError ? 'error' : 'done';
       tool.progress.value = '';
       break;
@@ -338,6 +343,7 @@ function applyEvent(ev: EventDTO): void {
           progress: signal(''),
           ms: signal<number | undefined>(undefined),
           truncated: false,
+          files: signal<FileRefDTO[]>([]),
           reason: ev.reason,
         });
       }
@@ -616,6 +622,17 @@ export async function refreshModels(): Promise<void> {
   }
 }
 
+/** Recover download links from stored tool output ("created /path/x.pdf (2 pages, …)"). */
+export function filesFromToolText(text: string): FileRefDTO[] {
+  const files: FileRefDTO[] = [];
+  const main = /^(?:created|overwrote|appended to) (.+?) \(\d+ (?:lines?|pages?)\b/.exec(text);
+  if (main?.[1]) files.push({ path: main[1], name: main[1].split(/[\\/]/).pop() ?? main[1] });
+  const copy = /Downloads folder: (.+)$/m.exec(text);
+  if (copy?.[1])
+    files.push({ path: copy[1].trim(), name: copy[1].trim().split(/[\\/]/).pop() ?? copy[1] });
+  return files;
+}
+
 function historyToItems(msgs: MessageDTO[]): Item[] {
   const out: Item[] = [];
   const tools = new Map<string, ToolItem>();
@@ -656,6 +673,7 @@ function historyToItems(msgs: MessageDTO[]): Item[] {
           progress: signal(''),
           ms: signal<number | undefined>(undefined),
           truncated: false,
+          files: signal<FileRefDTO[]>([]),
         };
         tools.set(c.id, tool);
         out.push(tool);
@@ -664,6 +682,7 @@ function historyToItems(msgs: MessageDTO[]): Item[] {
       const tool = tools.get(m.toolCallId);
       if (tool) {
         tool.output.value = m.text;
+        tool.files.value = filesFromToolText(m.text);
         if (/^error: the user declined/i.test(m.text)) tool.status.value = 'denied';
         else if (/^error: you already ran/i.test(m.text)) {
           tool.status.value = 'denied';

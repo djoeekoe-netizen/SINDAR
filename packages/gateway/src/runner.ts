@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   AgentError,
   createPolicyState,
@@ -16,6 +18,7 @@ import type {
   ApprovalAnswer,
   ApprovalDTO,
   EventDTO,
+  FileRefDTO,
   MessageDTO,
   ServerMessage,
   SessionDTO,
@@ -23,6 +26,45 @@ import type {
 } from './protocol.js';
 
 const TOOL_OUTPUT_LIMIT = 12_000;
+
+/** Tools whose single `meta.path` is a document the user may want to open (not every read/edit). */
+const PATH_IS_DELIVERABLE = new Set(['write_file']);
+
+/**
+ * Tool results may carry `meta.files` (explicit list, e.g. make_pdf) or `meta.path` (write_file)
+ * → download refs for the UI. Only existing regular files with absolute paths are passed on.
+ */
+export function filesFromMeta(
+  meta: Record<string, unknown> | undefined,
+  tool = 'write_file',
+): FileRefDTO[] {
+  if (!meta) return [];
+  const raw: unknown[] = Array.isArray(meta.files)
+    ? meta.files
+    : typeof meta.path === 'string' && PATH_IS_DELIVERABLE.has(tool)
+      ? [{ path: meta.path }]
+      : [];
+  const out: FileRefDTO[] = [];
+  for (const item of raw) {
+    const f = item as Partial<FileRefDTO>;
+    if (!f || typeof f.path !== 'string' || !path.isAbsolute(f.path)) continue;
+    let bytes = typeof f.bytes === 'number' ? f.bytes : undefined;
+    try {
+      const st = fs.statSync(f.path);
+      if (!st.isFile()) continue;
+      bytes ??= st.size;
+    } catch {
+      continue;
+    }
+    out.push({
+      path: f.path,
+      name: f.name ?? path.basename(f.path),
+      ...(bytes === undefined ? {} : { bytes }),
+      ...(f.mime ? { mime: f.mime } : {}),
+    });
+  }
+  return out;
+}
 const APPROVAL_TIMEOUT_MS = 15 * 60_000;
 
 export interface RunningTurn {
@@ -117,6 +159,7 @@ export function serializeEvent(ev: AgentEvent): EventDTO | undefined {
       return { type: 'tool_progress', callId: ev.call.id, line: ev.line };
     case 'tool_end': {
       const truncated = ev.result.content.length > TOOL_OUTPUT_LIMIT;
+      const files = filesFromMeta(ev.result.meta, ev.call.name);
       return {
         type: 'tool_end',
         callId: ev.call.id,
@@ -127,6 +170,7 @@ export function serializeEvent(ev: AgentEvent): EventDTO | undefined {
         isError: Boolean(ev.result.isError),
         ms: ev.ms,
         truncated,
+        ...(files.length ? { files } : {}),
       };
     }
     case 'tool_denied':

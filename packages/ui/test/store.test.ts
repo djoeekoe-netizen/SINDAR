@@ -242,4 +242,65 @@ describe('web UI store', () => {
     );
     expect(spinning.length).toBe(0);
   });
+
+  it('attaches downloadable files to tool cards (live events and loaded history)', () => {
+    const sock = FakeWebSocket.instances.at(-1)!;
+    store.sendMessage('سوي ملف PDF');
+    const ref = (JSON.parse(sock.sent.at(-1)!) as { clientRef: string }).clientRef;
+    const frames = turnFrames('t5', ref, 'تم');
+    const pdf = { path: '/home/u/.sindar/workspace/hello.pdf', name: 'hello.pdf', bytes: 4570 };
+    const call = { id: 'c1', name: 'make_pdf', arguments: { path: 'hello', content: 'مرحبا' } };
+    const toolFrames: ServerMessage[] = [
+      {
+        type: 'event',
+        sessionId: 's1',
+        turnId: 't5',
+        seq: 100,
+        event: { type: 'tool_start', call, summary: 'make_pdf hello', risk: 'write', reason: '' },
+      },
+      {
+        type: 'event',
+        sessionId: 's1',
+        turnId: 't5',
+        seq: 101,
+        event: {
+          type: 'tool_end',
+          callId: 'c1',
+          name: 'make_pdf',
+          content: 'created /home/u/.sindar/workspace/hello.pdf (1 page, 4 KB, rtl)',
+          isError: false,
+          ms: 120,
+          truncated: false,
+          files: [pdf],
+        },
+      },
+    ];
+    for (const f of [frames[0]!, ...toolFrames, ...frames.slice(1)]) sock.receive(f);
+    const tool = store.items.value.find((x) => x.kind === 'tool') as {
+      files: { value: Array<{ name: string }> };
+      status: { value: string };
+    };
+    expect(tool.status.value).toBe('done');
+    expect(tool.files.value).toEqual([pdf]);
+    expect(store.getApi()!.fileUrl(pdf.path)).toBe(
+      'http://gw.test/api/files?path=%2Fhome%2Fu%2F.sindar%2Fworkspace%2Fhello.pdf&token=tok',
+    );
+    expect(store.getApi()!.fileUrl(pdf.path, true)).toMatch(/&download=1$/);
+
+    // History has no meta — the paths are recovered from the tool's text.
+    expect(
+      store.filesFromToolText(
+        'created /w/تقرير.pdf (2 pages, 12 KB, rtl, font: NotoNaskhArabic-Regular.ttf)\n' +
+          "also copied to the phone's Downloads folder: /storage/emulated/0/Download/تقرير.pdf",
+      ),
+    ).toEqual([
+      { path: '/w/تقرير.pdf', name: 'تقرير.pdf' },
+      { path: '/storage/emulated/0/Download/تقرير.pdf', name: 'تقرير.pdf' },
+    ]);
+    expect(store.filesFromToolText('overwrote /w/notes.md (3 lines, 40 bytes)')).toEqual([
+      { path: '/w/notes.md', name: 'notes.md' },
+    ]);
+    expect(store.filesFromToolText('edited /w/notes.md: 1 replacement')).toEqual([]);
+    expect(store.filesFromToolText('error: nope')).toEqual([]);
+  });
 });

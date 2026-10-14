@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { ApprovalItem, AssistantItem, NoticeItem, ToolItem, UserItem } from '../lib/store.ts';
-import { answerApproval, lang, showReasoning, showToast } from '../lib/store.ts';
+import { answerApproval, getApi, lang, showReasoning, showToast } from '../lib/store.ts';
 import { renderMarkdown } from '../lib/markdown.ts';
 import { t } from '../lib/i18n.ts';
 
@@ -14,6 +14,7 @@ const TOOL_ICONS: Record<string, string> = {
   process: '⚙️',
   web_fetch: '🌐',
   web_search: '🔍',
+  make_pdf: '📕',
 };
 
 export function UserBubble({ item }: { item: UserItem }) {
@@ -72,6 +73,12 @@ export function AssistantBubble({ item }: { item: AssistantItem }) {
   );
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function ToolCard({ item }: { item: ToolItem }) {
   const l = lang.value;
   const [open, setOpen] = useState(false);
@@ -79,6 +86,8 @@ export function ToolCard({ item }: { item: ToolItem }) {
   const output = item.output.value;
   const progress = item.progress.value;
   const ms = item.ms.value;
+  const files = item.files.value;
+  const api = getApi();
   const label =
     status === 'running'
       ? t(l, 'tool.running')
@@ -105,6 +114,26 @@ export function ToolCard({ item }: { item: ToolItem }) {
       {status === 'running' && progress && (
         <div class="tool-progress" dir="ltr">
           {progress}
+        </div>
+      )}
+      {files.length > 0 && api && (
+        <div class="tool-files">
+          {files.map((f) => (
+            <div class="tool-file" key={f.path}>
+              <span class="tool-file-name" dir="auto" title={f.path}>
+                📎 {f.name}
+                {f.bytes !== undefined ? (
+                  <span class="muted small"> · {formatBytes(f.bytes)}</span>
+                ) : null}
+              </span>
+              <a class="btn small" href={api.fileUrl(f.path)} target="_blank" rel="noopener">
+                {t(l, 'tool.open')}
+              </a>
+              <a class="btn small" href={api.fileUrl(f.path, true)} download={f.name}>
+                {t(l, 'tool.download')}
+              </a>
+            </div>
+          ))}
         </div>
       )}
       {open && (

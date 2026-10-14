@@ -8,6 +8,7 @@ import {
   SessionStore,
   toolsForToolsets,
   collectSecretValues,
+  registerAssetDir,
   isLang,
   type AgentRuntime,
   type Config,
@@ -16,6 +17,7 @@ import {
   type LoadedConfig,
 } from '@sindar/core';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface AppOptions {
   home?: string;
@@ -34,8 +36,14 @@ export function pickLang(flag: string | undefined, config?: Config): Lang {
   return config?.ui.language ?? 'ar';
 }
 
+/** `packages/cli/assets` (bundled fonts…) — next to `dist/` when installed, next to `src/` in dev. */
+export function assetsDir(): string {
+  return path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets');
+}
+
 /** Load config + DB + providers + tools once per command. */
 export async function bootstrap(opts: AppOptions): Promise<App> {
+  registerAssetDir(assetsDir());
   const loaded = await loadConfig({ home: opts.home, env: process.env });
   const { config, paths, env } = loaded;
   const lang = pickLang(opts.lang, config);

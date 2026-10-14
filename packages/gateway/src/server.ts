@@ -77,6 +77,25 @@ const CONFIG_KEYS = new Set([
   'memory.nudgeEvery',
 ]);
 
+/** Extra types for files produced by tools (served by /api/files). */
+const DOWNLOAD_MIME: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.md': 'text/markdown; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.zip': 'application/zip',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.html': 'text/plain; charset=utf-8',
+  '.htm': 'text/plain; charset=utf-8',
+  '.js': 'text/plain; charset=utf-8',
+  '.mjs': 'text/plain; charset=utf-8',
+  '.svg': 'text/plain; charset=utf-8',
+};
+
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -413,6 +432,42 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
     const status = err instanceof SkillError ? (e.code === 'not-found' ? 404 : 400) : 500;
     return c.json({ error: e.message, code: e.code }, status);
   };
+  // ---- files produced by tools (download / open) --------------------------
+  app.get('/api/files', (c) => {
+    const p = c.req.query('path') ?? '';
+    if (!p || !path.isAbsolute(p)) return c.json({ error: 'absolute path required' }, 400);
+    const abs = path.resolve(p);
+    const secret = [rt.paths.env, rt.paths.db, `${rt.paths.db}-wal`, `${rt.paths.db}-shm`];
+    if (
+      secret.some((f) => path.resolve(f) === abs) ||
+      abs.includes(`${path.sep}.ssh${path.sep}`) ||
+      path.basename(abs) === 'gateway.token'
+    ) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    let st: fs.Stats;
+    try {
+      st = fs.statSync(abs);
+    } catch {
+      return c.json({ error: 'not found' }, 404);
+    }
+    if (!st.isFile()) return c.json({ error: 'not a file' }, 404);
+    if (st.size > 200 * 1024 * 1024) return c.json({ error: 'file too large' }, 413);
+    const ext = path.extname(abs).toLowerCase();
+    const mime = DOWNLOAD_MIME[ext] ?? MIME[ext] ?? 'application/octet-stream';
+    const inlineOk = ext === '.pdf' || mime.startsWith('image/') || mime.startsWith('text/');
+    const disposition = c.req.query('download') === '1' || !inlineOk ? 'attachment' : 'inline';
+    const name = path.basename(abs);
+    const ascii = name.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+    return c.body(fs.readFileSync(abs), 200, {
+      'content-type': mime,
+      'content-length': String(st.size),
+      'content-disposition': `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+    });
+  });
+
   app.get('/api/skills', (c) =>
     c.json({
       skills: skillStore().list().map(skillDTO),

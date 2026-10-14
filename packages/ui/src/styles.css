@@ -577,6 +577,32 @@ pre {
 .tool.denied {
   opacity: 0.8;
 }
+.tool-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 12px 10px;
+}
+.tool-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tool-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .tool-progress {
   font-family: var(--mono);
   font-size: 0.78rem;

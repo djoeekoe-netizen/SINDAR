@@ -59,6 +59,13 @@ export interface UsageDTO {
   outputTokens: number;
 }
 
+export interface FileRefDTO {
+  path: string;
+  name: string;
+  bytes?: number;
+  mime?: string;
+}
+
 /** Agent events as seen by clients (mirrors @sindar/core AgentEvent, serialised). */
 export type EventDTO =
   | { type: 'text'; delta: string }
@@ -79,6 +86,8 @@ export type EventDTO =
       isError: boolean;
       ms: number;
       truncated: boolean;
+      /** Files the tool produced (PDFs, written files…) — the UI offers them as downloads. */
+      files?: FileRefDTO[];
     }
   | { type: 'tool_denied'; call: ToolCallDTO; summary: string; reason: string }
   | { type: 'usage'; usage: UsageDTO; model: string }

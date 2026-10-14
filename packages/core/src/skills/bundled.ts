@@ -42,7 +42,7 @@ Use when the user asks "what is in this folder", "explain this project", "لخّ
     name: 'write-report',
     content: `---
 name: write-report
-description: "كتابة تقرير أو ملخص منظّم بصيغة Markdown وحفظه في مجلد العمل. Write a structured markdown report/summary and save it to the workspace."
+description: "كتابة تقرير أو ملخص منظّم (Markdown أو PDF) وحفظه في مجلد العمل. Write a structured report/summary as markdown or PDF and save it to the workspace."
 version: 1.0.0
 tags: [writing, files]
 ---
@@ -56,8 +56,9 @@ Use for: تقرير، ملخص، مذكرة، خطة — any document the user w
 2. Gather inputs first (files with \`read_file\`, web with \`web_search\`/\`web_fetch\`, past chats with \`session_search\`). Note sources.
 3. Outline: title · 2–4 sections · conclusion/next steps. Keep sections short with bullets and tables.
 4. Write the file with \`write_file\` to \`<workspace>/reports/YYYY-MM-DD-<slug>.md\` (create the folder; slug in latin letters).
-5. Verify: \`read_file\` the saved file head; fix formatting problems.
-6. Reply with: the path, a 3-line summary, and an offer to adjust tone/length.
+   - PDF wanted (ملف PDF)? Call \`make_pdf\` with the same markdown instead — it renders Arabic correctly and needs no extra programs. Never try pandoc/LaTeX/pip for this.
+5. Verify: \`read_file\` the saved file head; fix formatting problems (skip for PDF).
+6. Reply with: the path (on the phone also mention Downloads), a 3-line summary, and an offer to adjust tone/length.
 
 ## Style
 - Arabic reports: use simple, direct language; numbers in western digits; dates like 2026-10-14.

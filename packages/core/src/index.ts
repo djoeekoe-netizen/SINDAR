@@ -12,6 +12,8 @@ export * from './memory/index.js';
 export * from './skills/index.js';
 export * from './skills/bundled.js';
 export * from './skills/install.js';
+export * from './assets.js';
+export * from './documents/pdf.js';
 export * from './tools/index.js';
 export * from './policy/index.js';
 export * from './agent/index.js';

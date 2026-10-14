@@ -77,6 +77,13 @@ export class Api {
     return (await res.json()) as T;
   }
 
+  /** Direct link to a file produced by a tool (token in the query so <a href> / downloads work). */
+  fileUrl(filePath: string, download = false): string {
+    const q = new URLSearchParams({ path: filePath, token: this.conn.token });
+    if (download) q.set('download', '1');
+    return `${this.conn.url}/api/files?${q.toString()}`;
+  }
+
   static async health(url: string, timeoutMs = 4000): Promise<HealthDTO> {
     const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw new ApiError(`health ${res.status}`, res.status);

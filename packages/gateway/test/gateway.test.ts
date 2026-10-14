@@ -14,7 +14,7 @@ import {
   toolsForToolsets,
   type AgentRuntime,
 } from '@sindar/core';
-import { createGateway, type Gateway, type ServerMessage } from '../src/index.js';
+import { createGateway, filesFromMeta, type Gateway, type ServerMessage } from '../src/index.js';
 
 async function makeRuntime(): Promise<AgentRuntime & { cleanup(): Promise<void> }> {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-gw-'));
@@ -336,5 +336,42 @@ describe('gateway (mock provider)', () => {
     });
     expect(install.status).toBe(400);
     expect((await json(install)).error).toMatch(/expected github:/);
+  });
+
+  it('serves files produced by tools (make_pdf) and refuses secrets', async () => {
+    const pdf = path.join(rt.paths.workspace, 'تقرير.pdf');
+    fs.writeFileSync(pdf, '%PDF-1.3 fake');
+    const q = (p: string, extra = '') => `/api/files?path=${encodeURIComponent(p)}${extra}`;
+    // auth still applies
+    expect((await fetch(`${gw.url}${q(pdf)}`)).status).toBe(401);
+    const res = await api(q(pdf));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toContain('inline');
+    expect(res.headers.get('content-disposition')).toContain(
+      "filename*=UTF-8''%D8%AA%D9%82%D8%B1%D9%8A%D8%B1.pdf",
+    );
+    expect(await res.text()).toBe('%PDF-1.3 fake');
+    const dl = await api(q(pdf, '&download=1'));
+    expect(dl.headers.get('content-disposition')).toContain('attachment');
+    // scripts are never served executable
+    const html = path.join(rt.paths.workspace, 'page.html');
+    fs.writeFileSync(html, '<b>x</b>');
+    expect((await api(q(html))).headers.get('content-type')).toMatch(/^text\/plain/);
+    // guards
+    expect((await api(q('relative.pdf'))).status).toBe(400);
+    expect((await api(q(path.join(rt.paths.workspace, 'missing.pdf')))).status).toBe(404);
+    expect((await api(q(rt.paths.workspace))).status).toBe(404);
+    expect((await api(q(rt.paths.env))).status).toBe(403);
+    expect((await api(q(rt.paths.db))).status).toBe(403);
+    expect((await api(q(path.join(rt.paths.home, 'gateway.token')))).status).toBe(403);
+
+    // tool_end file refs come from tool meta (array or single path), existing files only
+    const refs = filesFromMeta({ files: [{ path: pdf, name: 'x.pdf', mime: 'application/pdf' }] });
+    expect(refs).toEqual([{ path: pdf, name: 'x.pdf', bytes: 13, mime: 'application/pdf' }]);
+    expect(filesFromMeta({ path: pdf })![0]!.name).toBe('تقرير.pdf');
+    expect(filesFromMeta({ path: path.join(rt.paths.workspace, 'nope.pdf') })).toEqual([]);
+    expect(filesFromMeta({ files: [{ path: 'rel.pdf' }] })).toEqual([]);
+    expect(filesFromMeta(undefined)).toEqual([]);
   });
 });

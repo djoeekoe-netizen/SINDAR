@@ -147,6 +147,11 @@ export function buildSystemPrompt(input: ContextInput): string {
         `- Keep tool calls focused; batch independent reads. Long outputs are truncated — ask for ranges.
 - Never repeat a tool call with the same arguments: its result is already in the conversation (an empty listing really is empty).`,
         `- When done, summarize what changed and where (paths) in one short message.`,
+        ...(tools.some((t) => t.name === 'make_pdf')
+          ? [
+              `- Documents: \`make_pdf\` turns text/markdown into a real PDF (Arabic supported) — use it for any "PDF" request instead of installing converters.`,
+            ]
+          : []),
       ].join('\n'),
     );
   }
