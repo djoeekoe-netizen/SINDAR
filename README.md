@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/djoeekoe-netizen/SINDAR/arena/ed5f3
 | المرحلة | الناتج | الحالة |
 |---|---|---|
 | **M0** | الهيكل والأساس (monorepo، config، DB، mock provider، CI، سكربت تثبيت Termux، `sindar doctor`) | ✅ |
-| **M1** | النواة + CLI — `sindar onboard` و`sindar chat` بالأدوات (ملفات، طرفية، ويب) مع موافقات | ✅ (قيد الاختبار على الجوال) |
+| **M1** | النواة + CLI — `sindar onboard` و`sindar chat` بالأدوات (ملفات، طرفية، ويب) مع موافقات | ✅ مكتمل ومُختبر على الجوال |
 | **M2** | Gateway + واجهة ويب/PWA عربية/إنجليزية — تُستخدم كتطبيق من الشاشة الرئيسية | ⬜ |
 | **M3** | حلقة التعلّم — ذاكرة، بحث جلسات، مهارات ذاتية | ⬜ |
 | **M4** | قناة Telegram | ⬜ |
