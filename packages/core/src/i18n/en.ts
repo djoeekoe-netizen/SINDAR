@@ -78,6 +78,9 @@ export const en: Record<keyof typeof ar, string> = {
   'chat.usage.none': 'No usage recorded yet',
   'chat.bye': 'Bye 👋',
   'chat.error': 'Error: {error}',
+  'chat.error.ratelimit':
+    '⏳ The provider is busy (free-tier rate limit). Wait about {seconds}s and resend — or add a fallback model: sindar model --fallbacks …',
+  'chat.error.auth': 'The provider rejected the key. Run: sindar onboard',
   'chat.error.nokey': 'No API key for the model provider. Run: sindar onboard',
   'chat.undo.ok': '↶ removed your last message and its reply',
   'chat.undo.none': 'Nothing to undo',

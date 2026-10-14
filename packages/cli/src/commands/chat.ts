@@ -12,6 +12,21 @@ import {
   type Session,
 } from '@sindar/core';
 import { bootstrap, type App } from '../app.js';
+
+/** Short, human error line: rate limits and auth problems get a plain explanation instead of the raw body. */
+function describeError(app: App, err: unknown): string {
+  const e = err as Error & { cause?: Error & { code?: string; retryAfterMs?: number } };
+  const cause = e?.cause ?? (e as { code?: string });
+  const code = (cause as { code?: string })?.code;
+  if (code === 'rate_limit') {
+    const secs = Math.ceil(((cause as { retryAfterMs?: number }).retryAfterMs ?? 30_000) / 1000);
+    return t(app.lang, 'chat.error.ratelimit', { seconds: secs });
+  }
+  if (code === 'auth' && (cause as { status?: number })?.status)
+    return t(app.lang, 'chat.error.auth');
+  const msg = e?.message ?? String(err);
+  return t(app.lang, 'chat.error', { error: msg.length > 300 ? `${msg.slice(0, 300)}…` : msg });
+}
 import { createChatView } from '../ui/chat-view.js';
 
 interface ChatOpts {
@@ -148,9 +163,7 @@ async function runOneShot(app: App, message: string, opts: ChatOpts): Promise<nu
     return 0;
   } catch (err) {
     view.flush();
-    process.stderr.write(
-      `${pc.red(t(app.lang, 'chat.error', { error: (err as Error).message }))}\n`,
-    );
+    process.stderr.write(`${pc.red(describeError(app, err))}\n`);
     if (err instanceof AgentError && /no API key/i.test(err.message))
       process.stderr.write(`${t(app.lang, 'chat.error.nokey')}\n`);
     return 1;
@@ -284,7 +297,7 @@ async function runInteractive(app: App, opts: ChatOpts): Promise<number> {
       });
     } catch (err) {
       view.flush();
-      out(pc.red(t(app.lang, 'chat.error', { error: (err as Error).message })));
+      out(pc.red(describeError(app, err)));
       if (/no API key/i.test((err as Error).message)) out(t(app.lang, 'chat.error.nokey'));
     } finally {
       view.flush();

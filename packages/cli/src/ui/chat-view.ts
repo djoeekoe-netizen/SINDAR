@@ -135,7 +135,9 @@ export function createChatView(
           );
           break;
         case 'error':
-          status(c.red(t(lang, 'chat.error', { error: ev.error.message })));
+          // Printed once by the command (which also has the i18n-friendly wording); just end the line.
+          clearProgress();
+          if (!atLineStart) write('\n');
           break;
         case 'done':
           if (ev.finishReason === 'cancelled') status(c.yellow(t(lang, 'chat.cancelled')));

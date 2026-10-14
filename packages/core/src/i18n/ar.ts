@@ -75,6 +75,9 @@ export const ar = {
   'chat.usage.none': 'لا يوجد استخدام مسجّل بعد',
   'chat.bye': 'إلى اللقاء 👋',
   'chat.error': 'خطأ: {error}',
+  'chat.error.ratelimit':
+    '⏳ الخدمة مزدحمة (حدّ الاستخدام المجاني). انتظر نحو {seconds} ثانية ثم أعد إرسال الرسالة — أو أضف نموذجاً احتياطياً: sindar model --fallbacks …',
+  'chat.error.auth': 'المفتاح مرفوض من المزود. أعد الإعداد: sindar onboard',
   'chat.error.nokey': 'لا يوجد مفتاح لمزود النموذج. شغّل: sindar onboard',
   'chat.undo.ok': '↶ حُذفت آخر رسالة لك وردّها',
   'chat.undo.none': 'لا يوجد ما يُتراجع عنه',
