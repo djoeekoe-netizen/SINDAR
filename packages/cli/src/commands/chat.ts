@@ -436,6 +436,14 @@ async function runInteractive(app: App, opts: ChatOpts): Promise<number> {
         w(line);
         return;
       }
+      // Phone keyboards make Ctrl+C awkward: `/stop` (or `/exit`) typed while a reply or tool is
+      // running cancels it immediately instead of being queued as a message.
+      const cmd = line.trim().toLowerCase();
+      if (current && /^\/(stop|cancel|exit|quit|q)$/.test(cmd)) {
+        current.abort();
+        if (/^\/(exit|quit|q)$/.test(cmd)) queue.push('/exit');
+        return;
+      }
       queue.push(line);
       void pump();
     });

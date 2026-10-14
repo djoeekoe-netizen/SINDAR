@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
@@ -61,7 +61,30 @@ function spawnShell(command: string, ctx: ToolContext, cwd: string) {
     } as NodeJS.ProcessEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
+    // Own process group on POSIX so a timeout/cancel can kill the whole tree
+    // (e.g. `sh -c "termux-battery-status"` → termux-api → …), not just the shell.
+    detached: process.platform !== 'win32',
   });
+}
+
+/** Kill a child *and everything it spawned* (process group on POSIX, `taskkill /T` on Windows). */
+export function killTree(child: ChildProcess, signal: 'SIGTERM' | 'SIGKILL' = 'SIGTERM'): void {
+  if (!child.pid) return;
+  if (process.platform === 'win32') {
+    if (signal === 'SIGKILL') {
+      execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], () => undefined);
+    } else child.kill();
+    return;
+  }
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      /* already gone */
+    }
+  }
 }
 
 export const terminal = defineTool({
@@ -141,15 +164,26 @@ export const terminal = defineTool({
       child.stdout?.on('data', onData);
       child.stderr?.on('data', onData);
       let killed: 'timeout' | 'cancelled' | undefined;
+      let done = false;
       const kill = (why: 'timeout' | 'cancelled') => {
+        if (killed) return;
         killed = why;
-        child.kill('SIGTERM');
-        setTimeout(() => child.kill('SIGKILL'), 2000).unref();
+        killTree(child, 'SIGTERM');
+        setTimeout(() => killTree(child, 'SIGKILL'), 2000).unref();
+        // Orphaned grandchildren can keep our pipes open forever: stop waiting for them.
+        setTimeout(() => {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          finish(child.exitCode);
+        }, 3000).unref();
       };
       const timer = setTimeout(() => kill('timeout'), timeoutMs);
       const onAbort = () => kill('cancelled');
       ctx.signal?.addEventListener('abort', onAbort, { once: true });
+      if (ctx.signal?.aborted) onAbort();
       const finish = (code: number | null, err?: Error) => {
+        if (done) return;
+        done = true;
         clearTimeout(timer);
         ctx.signal?.removeEventListener('abort', onAbort);
         let output = Buffer.concat(chunks).toString('utf8');
@@ -203,8 +237,8 @@ export const processTool = defineTool({
       return { content: `error: unknown process id ${args.id ?? '(missing)'}`, isError: true };
     if (args.action === 'kill') {
       if (p.exitCode !== null) return { content: `${p.id} already exited (${p.exitCode})` };
-      p.child.kill('SIGTERM');
-      setTimeout(() => p.child.kill('SIGKILL'), 2000).unref();
+      killTree(p.child, 'SIGTERM');
+      setTimeout(() => killTree(p.child, 'SIGKILL'), 2000).unref();
       return { content: `sent SIGTERM to ${p.id} (pid ${p.pid})` };
     }
     const text = fs.existsSync(p.logFile) ? fs.readFileSync(p.logFile, 'utf8') : '';
@@ -218,7 +252,7 @@ export const processTool = defineTool({
 
 /** Test/cleanup helper. */
 export function killAllBackground(): void {
-  for (const p of background.values()) if (p.exitCode === null) p.child.kill('SIGKILL');
+  for (const p of background.values()) if (p.exitCode === null) killTree(p.child, 'SIGKILL');
   background.clear();
 }
 

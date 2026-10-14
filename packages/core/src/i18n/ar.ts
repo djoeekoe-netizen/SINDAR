@@ -56,7 +56,7 @@ export const ar = {
   // ---- chat ----
   'chat.session.new': 'جلسة جديدة {id} · النموذج: {model}',
   'chat.session.resumed': 'استئناف الجلسة {id} ({count} رسالة) · النموذج: {model}',
-  'chat.hint': 'اكتب رسالتك ثم Enter · /help للأوامر · Ctrl+C لإيقاف الرد أو الخروج',
+  'chat.hint': 'اكتب رسالتك ثم Enter · /help للأوامر · /stop لإيقاف الرد · /exit للخروج',
   'chat.thinking': 'يفكّر…',
   'chat.tool.run': '⚙ {summary}',
   'chat.tool.done': '✓ {name} ({ms}ms)',
@@ -93,6 +93,7 @@ export const ar = {
   /undo           احذف آخر رسالة وردّها
   /compress       لخّص المحادثة القديمة الآن
   /sessions       آخر الجلسات (للاستئناف: sindar chat -r <id>)
+  /stop           إيقاف الرد أو الأمر الجاري (بدل Ctrl+C)
   /exit           خروج`,
   'chat.oneshot.empty': 'لا توجد رسالة. مثال: sindar chat "مرحباً"',
   'chat.compress.done': 'تم الضغط',

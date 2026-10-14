@@ -58,7 +58,7 @@ export const en: Record<keyof typeof ar, string> = {
   'chat.session.new': 'New session {id} · model: {model}',
   'chat.session.resumed': 'Resumed session {id} ({count} messages) · model: {model}',
   'chat.hint':
-    'Type a message and press Enter · /help for commands · Ctrl+C stops the reply or exits',
+    'Type a message and press Enter · /help for commands · /stop stops the reply · /exit quits',
   'chat.thinking': 'thinking…',
   'chat.tool.run': '⚙ {summary}',
   'chat.tool.done': '✓ {name} ({ms}ms)',
@@ -95,6 +95,7 @@ export const en: Record<keyof typeof ar, string> = {
   /undo           remove your last message and its reply
   /compress       summarize older conversation now
   /sessions       recent sessions (resume with: sindar chat -r <id>)
+  /stop           stop the current reply or command (instead of Ctrl+C)
   /exit           quit`,
   'chat.oneshot.empty': 'No message given. Example: sindar chat "hello"',
   'chat.compress.done': 'compressed',

@@ -88,6 +88,25 @@ describe('terminal tools', () => {
     expect(c.content).toContain('cancelled');
   }, 15_000);
 
+  it('kills the whole process tree when a grandchild keeps the pipes open (Termux:API hang)', async () => {
+    const ctx = toolContext(rt);
+    // The inner `sleep 20 &` inherits stdout; before the fix the tool waited for it (~20 s)
+    // even though the shell itself was killed on timeout.
+    const t0 = Date.now();
+    const t = await terminal.execute({ command: 'sleep 20 & sleep 20', timeout_s: 1 }, ctx);
+    expect(t.content).toContain('killed after 1s');
+    expect(Date.now() - t0).toBeLessThan(8000);
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 200);
+    const t1 = Date.now();
+    const c = await terminal.execute(
+      { command: 'sleep 20 & sleep 20' },
+      { ...ctx, signal: ac.signal },
+    );
+    expect(c.content).toContain('cancelled');
+    expect(Date.now() - t1).toBeLessThan(8000);
+  }, 20_000);
+
   it('manages background processes', async () => {
     const ctx = toolContext(rt);
     const started = await terminal.execute(
