@@ -6,6 +6,7 @@ import {
   getApi,
   lang,
   memoryOpen,
+  channelsOpen,
   newChat,
   openSession,
   pending,
@@ -147,6 +148,7 @@ export function Sidebar() {
                   <button class="session-main" onClick={() => openSession(s.id)}>
                     <div class="session-title" dir="auto">
                       {hasPending ? '🔐 ' : isRun ? '⏳ ' : ''}
+                      {s.channel === 'telegram' ? '✈️ ' : ''}
                       {s.title || t(l, 'sessions.untitled')}
                     </div>
                     <div class="session-meta muted small">
@@ -194,6 +196,15 @@ export function Sidebar() {
               }}
             >
               📘 {t(l, 'sidebar.skills')}
+            </button>
+            <button
+              class="btn"
+              onClick={() => {
+                sidebarOpen.value = false;
+                channelsOpen.value = true;
+              }}
+            >
+              ✈️ {t(l, 'sidebar.channels')}
             </button>
           </div>
           <button

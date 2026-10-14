@@ -113,6 +113,37 @@ export interface PublicConfigDTO {
   build: string;
 }
 
+export interface PairingDTO {
+  userId: string;
+  displayName: string | null;
+  code: string | null;
+  status: 'pending' | 'approved' | 'revoked';
+  createdAt: number;
+}
+
+export interface TelegramChannelDTO {
+  /** `channels.telegram.enabled` in config. */
+  enabled: boolean;
+  /** A bot token is present in `.env`. */
+  configured: boolean;
+  tokenEnv: string;
+  running: boolean;
+  bot?: { id: number; username: string; name: string };
+  startedAt?: number;
+  lastUpdateAt?: number;
+  lastError?: string;
+  updates: number;
+  pending: PairingDTO[];
+  approved: PairingDTO[];
+  allowFrom: number[];
+  streaming: boolean;
+  groups: 'mention' | 'all' | 'off';
+}
+
+export interface ChannelsDTO {
+  telegram: TelegramChannelDTO;
+}
+
 export interface ProviderDTO {
   id: string;
   name: string;

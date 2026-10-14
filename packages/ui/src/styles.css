@@ -1172,3 +1172,70 @@ mark {
 .skill-body h3 {
   font-size: 0.95rem;
 }
+
+/* ---- channels panel ---- */
+.modal-body.channels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-body.channels > * {
+  flex-shrink: 0;
+}
+.modal-body.channels h3,
+.modal-body.channels h4 {
+  margin: 6px 0 0;
+}
+.modal-body.channels p {
+  margin: 0;
+}
+.channels .card {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.channels .steps {
+  white-space: pre-wrap;
+  font: inherit;
+  margin: 0;
+  color: var(--muted);
+}
+.channels .field input,
+.channels .field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: inherit;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.channels .field.inline {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.channels .row {
+  align-items: center;
+}
+.channels .row.between {
+  justify-content: space-between;
+}
+.channels .row.wrap {
+  flex-wrap: wrap;
+}
+.channels .list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.channels .grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}

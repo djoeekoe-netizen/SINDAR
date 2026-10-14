@@ -14,7 +14,10 @@ import {
   isChatModelId,
   resolveProviders,
   setConfigValue,
+  upsertEnvVar,
   getProviderTemplate,
+  PairingStore,
+  type Pairing,
   MemoryFiles,
   MemoryError,
   SkillStore,
@@ -30,8 +33,10 @@ import {
 } from '@sindar/core';
 import type {
   ApprovalAnswer,
+  ChannelsDTO,
   ClientMessage,
   HealthDTO,
+  PairingDTO,
   MemoryFileDTO,
   ModelsDTO,
   PublicConfigDTO,
@@ -41,6 +46,12 @@ import type {
 import { TurnManager, toMessageDTO, toSessionDTO } from './runner.js';
 import { loadOrCreateToken } from './token.js';
 import { acquireWakeLock, releaseWakeLock } from './wake-lock.js';
+import {
+  TELEGRAM_CHANNEL,
+  TelegramApi,
+  TelegramChannel,
+  type TelegramChannelOptions,
+} from './channels/telegram/index.js';
 
 export const GATEWAY_DEFAULT_PORT = 18789;
 
@@ -53,6 +64,10 @@ export interface GatewayOptions {
   uiDir?: string;
   /** Acquire `termux-wake-lock` on Termux so Android keeps the brain alive. Default true. */
   wakeLock?: boolean;
+  /** Start configured channels (Telegram…) with the gateway. Default true. */
+  channels?: boolean;
+  /** Telegram transport overrides (tests inject a fake `fetch`). */
+  telegram?: Omit<TelegramChannelOptions, 'token'>;
 }
 
 export interface Gateway {
@@ -64,6 +79,8 @@ export interface Gateway {
   server: Server;
   /** Number of connected WebSocket clients. */
   clients(): number;
+  /** The Telegram channel while it is running (tests, status). */
+  telegram(): TelegramChannel | undefined;
   close(): Promise<void>;
 }
 
@@ -75,7 +92,18 @@ const CONFIG_KEYS = new Set([
   'agent.approvalMode',
   'skills.autoCreate',
   'memory.nudgeEvery',
+  'channels.telegram.enabled',
+  'channels.telegram.streaming',
+  'channels.telegram.groups',
 ]);
+
+const toPairingDTO = (p: Pairing): PairingDTO => ({
+  userId: p.userId,
+  displayName: p.displayName,
+  code: p.code,
+  status: p.status,
+  createdAt: p.createdAt,
+});
 
 /** Extra types for files produced by tools (served by /api/files). */
 const DOWNLOAD_MIME: Record<string, string> = {
@@ -171,6 +199,79 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
   const uiDir =
     opts.uiDir && fs.existsSync(path.join(opts.uiDir, 'index.html')) ? opts.uiDir : undefined;
 
+  // ---- channels (Telegram) ---------------------------------------------
+  const pairings = rt.db ? new PairingStore(rt.db) : undefined;
+  let telegram: TelegramChannel | undefined;
+  let telegramError: string | undefined;
+  let telegramRetry: NodeJS.Timeout | undefined;
+  const telegramToken = () => rt.env[rt.config.channels.telegram.tokenEnv]?.trim() || undefined;
+
+  async function startTelegram(): Promise<{ ok: boolean; error?: string }> {
+    if (telegramRetry) {
+      clearTimeout(telegramRetry);
+      telegramRetry = undefined;
+    }
+    if (!pairings) return { ok: false, error: 'no database' };
+    const tok = telegramToken();
+    if (!tok) return { ok: false, error: 'no token' };
+    if (telegram?.status().running && telegram.api.token === tok) return { ok: true };
+    await telegram?.stop();
+    telegram = new TelegramChannel(rt, manager, pairings, { token: tok, ...opts.telegram });
+    try {
+      await telegram.start();
+      telegramError = undefined;
+      return { ok: true };
+    } catch (err) {
+      telegramError = (err as Error).message;
+      rt.logger.warn('telegram: start failed', { error: telegramError });
+      return { ok: false, error: telegramError };
+    }
+  }
+
+  /** Start with retries (the phone may be offline for a while); gives up on a rejected token. */
+  function ensureTelegram(attempt = 0): void {
+    if (!rt.config.channels.telegram.enabled || !telegramToken()) return;
+    void startTelegram().then((r) => {
+      if (r.ok || /401|unauthorized/i.test(r.error ?? '')) return;
+      if (!rt.config.channels.telegram.enabled) return;
+      const wait = Math.min(60_000, 5000 * 2 ** Math.min(attempt, 4));
+      telegramRetry = setTimeout(() => ensureTelegram(attempt + 1), wait);
+      telegramRetry.unref?.();
+    });
+  }
+
+  async function stopTelegram(): Promise<void> {
+    if (telegramRetry) {
+      clearTimeout(telegramRetry);
+      telegramRetry = undefined;
+    }
+    await telegram?.stop();
+    telegram = undefined;
+  }
+
+  function channelsDTO(): ChannelsDTO {
+    const cfg = rt.config.channels.telegram;
+    const st = telegram?.status();
+    return {
+      telegram: {
+        enabled: cfg.enabled,
+        configured: Boolean(telegramToken()),
+        tokenEnv: cfg.tokenEnv,
+        running: st?.running ?? false,
+        bot: st?.bot,
+        startedAt: st?.startedAt,
+        lastUpdateAt: st?.lastUpdateAt,
+        lastError: st?.lastError ?? telegramError,
+        updates: st?.updates ?? 0,
+        pending: pairings?.pending(TELEGRAM_CHANNEL).map(toPairingDTO) ?? [],
+        approved: pairings?.list(TELEGRAM_CHANNEL, 'approved').map(toPairingDTO) ?? [],
+        allowFrom: [...cfg.allowFrom],
+        streaming: cfg.streaming,
+        groups: cfg.groups,
+      },
+    };
+  }
+
   const app = new Hono();
   app.use('/api/*', cors({ origin: '*', allowHeaders: ['Authorization', 'Content-Type'] }));
 
@@ -242,6 +343,17 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
         case 'memory.nudgeEvery':
           rt.config.memory.nudgeEvery = Number(value);
           break;
+        case 'channels.telegram.enabled':
+          rt.config.channels.telegram.enabled = Boolean(value);
+          if (value) ensureTelegram();
+          else await stopTelegram();
+          break;
+        case 'channels.telegram.streaming':
+          rt.config.channels.telegram.streaming = Boolean(value);
+          break;
+        case 'channels.telegram.groups':
+          rt.config.channels.telegram.groups = value as 'mention' | 'all' | 'off';
+          break;
         default:
           break;
       }
@@ -249,6 +361,51 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
     const cfg = publicConfig(rt);
     broadcast({ type: 'config', config: cfg });
     return c.json({ ok: true, applied, config: cfg });
+  });
+
+  // ---- channels ---------------------------------------------------------
+  app.get('/api/channels', (c) => c.json(channelsDTO()));
+  /** Save a bot token (validated with getMe), enable the channel and start it. */
+  app.post('/api/channels/telegram/token', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { token?: string };
+    const tok = (body.token ?? '').trim();
+    if (!/^\d+:[\w-]{30,}$/.test(tok)) return c.json({ error: 'invalid token format' }, 400);
+    try {
+      const me = await new TelegramApi(tok, opts.telegram).getMe();
+      if (!me.is_bot) return c.json({ error: 'not a bot token' }, 400);
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    const envName = rt.config.channels.telegram.tokenEnv;
+    upsertEnvVar(rt.paths.env, envName, tok);
+    rt.env[envName] = tok;
+    if (!rt.config.channels.telegram.enabled) {
+      setConfigValue(rt.paths.config, 'channels.telegram.enabled', true);
+      rt.config.channels.telegram.enabled = true;
+    }
+    const r = await startTelegram();
+    if (!r.ok) return c.json({ error: r.error, channels: channelsDTO() }, 502);
+    return c.json({ ok: true, channels: channelsDTO() });
+  });
+  app.post('/api/channels/telegram/restart', async (c) => {
+    await stopTelegram();
+    const r = await startTelegram();
+    return c.json({ ok: r.ok, error: r.error, channels: channelsDTO() }, r.ok ? 200 : 502);
+  });
+  app.post('/api/channels/telegram/pairings/:code/approve', async (c) => {
+    if (!pairings) return c.json({ error: 'no database' }, 500);
+    const p = pairings.approve(TELEGRAM_CHANNEL, c.req.param('code'));
+    if (!p) return c.json({ error: 'unknown or expired code' }, 404);
+    rt.logger.info('telegram: pairing approved', { chatId: p.userId, name: p.displayName });
+    await telegram?.notifyPaired(Number(p.userId));
+    return c.json({ ok: true, pairing: toPairingDTO(p), channels: channelsDTO() });
+  });
+  app.delete('/api/channels/telegram/pairings/:userId', async (c) => {
+    if (!pairings) return c.json({ error: 'no database' }, 500);
+    const id = c.req.param('userId');
+    if (!pairings.revoke(TELEGRAM_CHANNEL, id)) return c.json({ error: 'not found' }, 404);
+    await telegram?.notifyRevoked(Number(id));
+    return c.json({ ok: true, channels: channelsDTO() });
   });
 
   // ---- models -----------------------------------------------------------
@@ -569,6 +726,11 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
       pending: manager.pendingApprovals(),
       clients: sockets.size,
       uptimeS: Math.round((Date.now() - startedAt) / 1000),
+      telegram: {
+        enabled: rt.config.channels.telegram.enabled,
+        running: telegram?.status().running ?? false,
+        bot: telegram?.status().bot?.username,
+      },
     }),
   );
 
@@ -723,6 +885,7 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
   const actualPort = typeof addr === 'object' && addr ? addr.port : port;
   const url = `http://${host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host}:${actualPort}`;
   rt.logger.info('gateway listening', { url, host, port: actualPort, ui: Boolean(uiDir) });
+  if (opts.channels !== false) ensureTelegram();
 
   return {
     host,
@@ -732,9 +895,11 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
     manager,
     server,
     clients: () => sockets.size,
+    telegram: () => telegram,
     async close() {
       clearInterval(pinger);
       unsubscribe();
+      await stopTelegram();
       await manager.shutdown();
       for (const ws of sockets) ws.close(1001, 'gateway shutting down');
       wss.close();

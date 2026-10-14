@@ -17,3 +17,4 @@ export * from './documents/pdf.js';
 export * from './tools/index.js';
 export * from './policy/index.js';
 export * from './agent/index.js';
+export * from './channels/index.js';

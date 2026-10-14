@@ -140,6 +140,19 @@ export async function runDoctor(opts: DoctorOptions = {}): Promise<DoctorReport>
       });
     if (parseModelRef(model).provider === 'mock')
       checks.push({ id: 'model', status: 'warn', title: T('doctor.model.mock') });
+    const tg = loaded.config.channels.telegram;
+    if (tg.enabled) {
+      const hasToken = Boolean(loaded.env[tg.tokenEnv] ?? env[tg.tokenEnv]);
+      checks.push({
+        id: 'telegram',
+        status: hasToken ? 'ok' : 'warn',
+        title: hasToken
+          ? T('doctor.telegram.ok', { env: tg.tokenEnv })
+          : T('doctor.telegram.notoken', { env: tg.tokenEnv }),
+      });
+    } else {
+      checks.push({ id: 'telegram', status: 'info', title: T('doctor.telegram.off') });
+    }
   } else {
     checks.push({
       id: 'config',

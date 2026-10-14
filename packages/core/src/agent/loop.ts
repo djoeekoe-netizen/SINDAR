@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Config, Lang } from '../config/schema.js';
 import type { Logger } from '../logger.js';
+import type { Db } from '../db/types.js';
 import type { SindarPaths } from '../paths.js';
 import type { PlatformInfo } from '../platform.js';
 import { decide, sessionKey, type PolicyDecision, type PolicyState } from '../policy/index.js';
@@ -60,6 +61,8 @@ export interface AgentRuntime {
   /** Learning loop services (created from paths/config when omitted). */
   memory?: MemoryFiles;
   skills?: SkillStore;
+  /** Database handle — needed by channels (pairing store). */
+  db?: Db;
 }
 
 export interface TurnOptions {

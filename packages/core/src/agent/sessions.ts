@@ -214,13 +214,22 @@ export class SessionStore {
     return rows.length === 1 ? toSession(rows[0]!) : undefined;
   }
 
-  last(channel?: string): Session | undefined {
-    const r = channel
-      ? this.db.get<SessionRow>(
-          'SELECT * FROM sessions WHERE channel = ? ORDER BY updated_at DESC LIMIT 1',
-          [channel],
-        )
-      : this.db.get<SessionRow>('SELECT * FROM sessions ORDER BY updated_at DESC LIMIT 1');
+  /** Most recent session — optionally for one channel, and for one user/chat of that channel. */
+  last(channel?: string, userId?: string): Session | undefined {
+    let r: SessionRow | undefined;
+    if (channel && userId !== undefined) {
+      r = this.db.get<SessionRow>(
+        'SELECT * FROM sessions WHERE channel = ? AND user_id = ? ORDER BY updated_at DESC LIMIT 1',
+        [channel, userId],
+      );
+    } else if (channel) {
+      r = this.db.get<SessionRow>(
+        'SELECT * FROM sessions WHERE channel = ? ORDER BY updated_at DESC LIMIT 1',
+        [channel],
+      );
+    } else {
+      r = this.db.get<SessionRow>('SELECT * FROM sessions ORDER BY updated_at DESC LIMIT 1');
+    }
     return r ? toSession(r) : undefined;
   }
 

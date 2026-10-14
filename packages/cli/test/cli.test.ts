@@ -194,4 +194,26 @@ describe.skipIf(!hasBuild)('chat / onboard / config (mock provider)', () => {
     expect(r.stderr).toContain('sindar onboard');
     run(['config', 'set', 'model.default', 'mock:echo'], env);
   });
+
+  it('telegram: status/approve/on/off work without a running gateway', () => {
+    const st = run(['--lang', 'en', 'telegram'], env);
+    expect(st.status).toBe(0);
+    expect(st.stdout).toContain('Telegram: not set up');
+    expect(st.stdout).toContain('Token: missing');
+    const bad = run(['--lang', 'en', 'telegram', 'setup', '--token', 'nope', '--no-wait'], env);
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain('does not look like a bot token');
+    const unknown = run(['--lang', 'en', 'telegram', 'approve', '123456'], env);
+    expect(unknown.status).toBe(1);
+    expect(unknown.stderr).toContain('No pending request');
+    expect(run(['--lang', 'en', 'telegram', 'on'], env).stdout).toContain(
+      'channels.telegram.enabled = true',
+    );
+    expect(run(['config', 'get', 'channels.telegram.enabled'], env).stdout.trim()).toBe('true');
+    const doctor = JSON.parse(run(['doctor', '--json'], env).stdout) as {
+      checks: Array<{ id: string; status: string }>;
+    };
+    expect(doctor.checks.find((c) => c.id === 'telegram')?.status).toBe('warn');
+    expect(run(['--lang', 'en', 'telegram', 'off'], env).status).toBe(0);
+  });
 });

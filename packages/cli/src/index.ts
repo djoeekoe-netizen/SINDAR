@@ -11,6 +11,7 @@ import { registerChat } from './commands/chat.js';
 import { registerConfig } from './commands/config.js';
 import { registerDoctor } from './commands/doctor.js';
 import { registerDashboard, registerGateway } from './commands/gateway.js';
+import { registerTelegram } from './commands/telegram.js';
 import { registerModel } from './commands/model.js';
 import { registerOnboard } from './commands/onboard.js';
 import { registerSessions } from './commands/sessions.js';
@@ -47,6 +48,7 @@ registerConfig(program);
 registerDoctor(program);
 registerUpdate(program);
 registerBackground(program);
+registerTelegram(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   const msg = err instanceof Error ? err.message : String(err);

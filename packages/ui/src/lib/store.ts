@@ -92,6 +92,7 @@ export const sidebarOpen = signal(false);
 export const settingsOpen = signal(false);
 export const memoryOpen = signal(false);
 export const skillsOpen = signal(false);
+export const channelsOpen = signal(false);
 export const modelPickerOpen = signal(false);
 export const toast = signal<string | undefined>(undefined);
 export const version = signal<{ version: string; build: string } | undefined>(undefined);

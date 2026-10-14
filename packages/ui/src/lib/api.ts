@@ -1,6 +1,7 @@
 import type {
   ApprovalAnswer,
   ApprovalDTO,
+  ChannelsDTO,
   HealthDTO,
   MemoryFileDTO,
   MessageDTO,
@@ -194,6 +195,33 @@ export class Api {
     return this.req<{ ok: true }>(`/api/skills/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     });
+  }
+  channels() {
+    return this.req<ChannelsDTO>('/api/channels');
+  }
+  setTelegramToken(token: string) {
+    return this.req<{ ok: true; channels: ChannelsDTO }>('/api/channels/telegram/token', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+  restartTelegram() {
+    return this.req<{ ok: boolean; error?: string; channels: ChannelsDTO }>(
+      '/api/channels/telegram/restart',
+      { method: 'POST' },
+    );
+  }
+  approvePairing(code: string) {
+    return this.req<{ ok: true; channels: ChannelsDTO }>(
+      `/api/channels/telegram/pairings/${encodeURIComponent(code)}/approve`,
+      { method: 'POST' },
+    );
+  }
+  revokePairing(userId: string) {
+    return this.req<{ ok: true; channels: ChannelsDTO }>(
+      `/api/channels/telegram/pairings/${encodeURIComponent(userId)}`,
+      { method: 'DELETE' },
+    );
   }
   installSkill(input: { source: string; force?: boolean; overwrite?: boolean; dryRun?: boolean }) {
     return this.req<{

@@ -110,6 +110,23 @@ export const ConfigSchema = z.object({
       file: z.boolean().default(true),
     })
     .prefault({}),
+  channels: z
+    .object({
+      telegram: z
+        .object({
+          enabled: z.boolean().default(false),
+          /** Name of the environment variable (in `.env`) holding the bot token from @BotFather. */
+          tokenEnv: z.string().default('TELEGRAM_BOT_TOKEN'),
+          /** Chat ids allowed without pairing (besides the ones approved with a code). */
+          allowFrom: z.array(z.number().int()).default([]),
+          /** Edit the reply while the model streams (false = one message at the end). */
+          streaming: z.boolean().default(true),
+          /** Groups: reply only when mentioned/replied-to, to everything, or never. */
+          groups: z.enum(['mention', 'all', 'off']).default('mention'),
+        })
+        .prefault({}),
+    })
+    .prefault({}),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

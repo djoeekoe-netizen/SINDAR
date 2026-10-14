@@ -32,6 +32,7 @@ async function makeRuntime(): Promise<AgentRuntime & { cleanup(): Promise<void> 
     registry: new ProviderRegistry(config, {}),
     tools: toolsForToolsets(config.agent.toolsets),
     store: new SessionStore(db),
+    db,
     cleanup: async () => {
       await db.close();
       fs.rmSync(home, { recursive: true, force: true });

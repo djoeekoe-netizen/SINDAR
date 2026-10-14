@@ -87,6 +87,8 @@ export interface SendInput {
   cwd?: string;
   clientRef?: string;
   channel?: string;
+  /** Channel-side identity of the chat/user (Telegram chat id, …) for per-chat session lookup. */
+  userId?: string;
 }
 
 export type Listener = (msg: ServerMessage) => void;
@@ -276,11 +278,14 @@ export class TurnManager {
     return [...this.approvals.values()].map((p) => p.dto);
   }
 
-  createSession(input: { model?: string; cwd?: string; channel?: string } = {}): Session {
+  createSession(
+    input: { model?: string; cwd?: string; channel?: string; userId?: string } = {},
+  ): Session {
     const session = this.rt.store.create({
       channel: input.channel ?? 'web',
       cwd: input.cwd ?? this.rt.paths.workspace,
       model: input.model,
+      userId: input.userId,
     });
     this.broadcast({ type: 'session', action: 'created', session: this.summary(session) });
     return session;
@@ -322,7 +327,12 @@ export class TurnManager {
     let session = input.sessionId ? this.rt.store.get(input.sessionId) : undefined;
     if (input.sessionId && !session) throw new Error(`unknown session ${input.sessionId}`);
     if (!session)
-      session = this.createSession({ model: input.model, cwd: input.cwd, channel: input.channel });
+      session = this.createSession({
+        model: input.model,
+        cwd: input.cwd,
+        channel: input.channel,
+        userId: input.userId,
+      });
     if (this.running.has(session.id)) throw new Error('a turn is already running for this session');
     if (input.model && input.model !== session.model) {
       this.rt.store.update(session.id, { model: input.model });
