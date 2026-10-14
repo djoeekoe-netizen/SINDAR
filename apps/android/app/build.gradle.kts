@@ -56,6 +56,9 @@ android {
 }
 
 dependencies {
+  // Aligns every transitive kotlin-stdlib(-jdk7/-jdk8) to one version; otherwise AndroidX
+  // pulls stdlib 1.8.x next to an old stdlib-jdk8 and the duplicate-classes check fails.
+  implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.24"))
   implementation("androidx.appcompat:appcompat:1.7.0")
   implementation("androidx.webkit:webkit:1.12.1")
 }
