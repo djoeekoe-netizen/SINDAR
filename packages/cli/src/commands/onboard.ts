@@ -125,30 +125,37 @@ export async function onboard(
   let resolved: ResolvedProvider = resolveProvider(tpl.id, app.config.providers[tpl.id], app.env)!;
   if (tpl.requiresKey && envKey) {
     let key = opts.key?.trim();
+    let visible = false;
+    const savedKey = resolved.apiKey;
     for (;;) {
       if (!key) {
         if (tpl.signupUrl) out(t(lang, 'onboard.key.url', { url: pc.underline(tpl.signupUrl) }));
-        if (resolved.apiKey)
-          out(pc.dim(t(lang, 'onboard.key.existing', { masked: maskKey(resolved.apiKey) })));
+        if (tpl.id === 'groq') out(pc.dim(t(lang, 'onboard.key.groqhint')));
+        if (savedKey) out(pc.dim(t(lang, 'onboard.key.existing', { masked: maskKey(savedKey) })));
         if (!interactive) {
-          if (!resolved.apiKey) {
+          if (!savedKey) {
             out(pc.red(t(lang, 'model.nokey', { env: envKey })));
             return 1;
           }
-          key = resolved.apiKey;
+          key = savedKey;
         } else {
-          key =
-            (await p.askHidden(t(lang, 'onboard.key.prompt', { env: envKey }))) ||
-            resolved.apiKey ||
-            '';
+          const prompt = t(lang, 'onboard.key.prompt', { env: envKey });
+          key = (visible ? await p.ask(prompt) : await p.askHidden(prompt)) || savedKey || '';
         }
         if (!key) {
           out(t(lang, 'onboard.aborted'));
           return 1;
         }
+        // "…"/"..." means a masked copy from a list; keys are printable ASCII without spaces.
+        const masked = /…|\.\.\.|\*{3,}/.test(key);
+        key = key.replace(/[^\x21-\x7e]/g, '');
+        out(pc.dim(t(lang, 'onboard.key.received', { masked: maskKey(key), len: key.length })));
+        if (masked || key.length < 20) out(pc.yellow(t(lang, 'onboard.key.suspicious')));
       }
-      app.env[envKey] = key;
-      resolved = resolveProvider(tpl.id, app.config.providers[tpl.id], app.env)!;
+      resolved = resolveProvider(tpl.id, app.config.providers[tpl.id], {
+        ...app.env,
+        [envKey]: key,
+      })!;
       if (opts.test === false) break;
       out(pc.dim(t(lang, 'onboard.key.testing')));
       const ping = await instantiateProvider(resolved).ping();
@@ -159,7 +166,10 @@ export async function onboard(
       out(pc.red(t(lang, 'onboard.key.fail', { error: ping.message ?? '?' })));
       if (!interactive || !(await p.confirm(t(lang, 'onboard.key.retry'), true))) return 1;
       key = undefined;
+      visible = true;
+      out(pc.dim(t(lang, 'onboard.key.visible')));
     }
+    app.env[envKey] = key;
     upsertEnvVar(app.paths.env, envKey, key);
     out(pc.dim(t(lang, 'onboard.key.saved', { file: app.paths.env })));
   } else if (!opts.test === false) {

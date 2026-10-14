@@ -110,6 +110,12 @@ export const ar = {
   'onboard.key.ok': 'المفتاح يعمل ✓ ({ms}ms)',
   'onboard.key.fail': 'فشل الاختبار: {error}',
   'onboard.key.retry': 'إعادة المحاولة؟ [Y/n]: ',
+  'onboard.key.received': 'تم استلام مفتاح: {masked} ({len} حرفاً)',
+  'onboard.key.suspicious':
+    'تنبيه: المفتاح يبدو ناقصاً أو مُقنّعاً (فيه … أو مسافات أو قصير جداً). انسخه من النافذة التي تظهر فور إنشائه — القائمة تعرض نسخة مخفية فقط.',
+  'onboard.key.visible': 'هذه المرة سيظهر المفتاح أثناء اللصق لتتأكد منه.',
+  'onboard.key.groqhint':
+    'في Groq: اضغط Create API Key ← Submit ← زر Copy بجانب المفتاح الذي يبدأ بـ gsk_ (يظهر مرة واحدة فقط).',
   'onboard.key.saved': 'حُفظ المفتاح في {file} (صلاحيات 600)',
   'onboard.local.unreachable': 'الخادم المحلي غير متاح على {url} — شغّله ثم أعد المحاولة',
   'onboard.model.title': 'اختر النموذج:',

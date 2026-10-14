@@ -8,7 +8,10 @@ export interface Prompter {
   close(): void;
 }
 
-/** readline-based prompts that work in Termux, Windows terminals and piped stdin. */
+/**
+ * readline-based prompts that work in Termux, Windows terminals and piped stdin.
+ * Lines typed ahead of a question are queued instead of being lost.
+ */
 export function createPrompter(
   input: NodeJS.ReadableStream = process.stdin,
   output: NodeJS.WritableStream = process.stdout,
@@ -22,9 +25,49 @@ export function createPrompter(
     },
   });
   const rl = readline.createInterface({ input, output: mutable, terminal: interactive });
-  const question = (q: string) =>
+  const queue: string[] = [];
+  let waiter: ((line: string) => void) | undefined;
+  let closed = false;
+  rl.on('line', (line) => {
+    if (waiter) {
+      const w = waiter;
+      waiter = undefined;
+      w(line);
+    } else queue.push(line);
+  });
+  rl.on('close', () => {
+    closed = true;
+    if (waiter) {
+      const w = waiter;
+      waiter = undefined;
+      w('');
+    }
+  });
+  const question = (q: string, hidden = false) =>
     new Promise<string>((resolve) => {
-      rl.question(q, (a) => resolve(a));
+      if (hidden) {
+        output.write(q);
+        rl.setPrompt('');
+        muted = true;
+      } else rl.setPrompt(q);
+      const finish = (line: string) => {
+        if (hidden) {
+          muted = false;
+          output.write('\n');
+        }
+        resolve(line);
+      };
+      if (queue.length) {
+        if (!hidden) output.write(q);
+        finish(queue.shift()!);
+        return;
+      }
+      if (closed) {
+        finish('');
+        return;
+      }
+      waiter = finish;
+      rl.prompt();
     });
   return {
     async ask(q, def) {
@@ -32,15 +75,7 @@ export function createPrompter(
       return a || def || '';
     },
     async askHidden(q) {
-      output.write(q);
-      muted = true;
-      try {
-        const a = await question('');
-        return a.trim();
-      } finally {
-        muted = false;
-        output.write('\n');
-      }
+      return (await question(q, true)).trim();
     },
     async confirm(q, def = true) {
       const a = (await question(q)).trim().toLowerCase();

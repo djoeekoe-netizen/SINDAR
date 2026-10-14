@@ -113,6 +113,12 @@ export const en: Record<keyof typeof ar, string> = {
   'onboard.key.ok': 'Key works ✓ ({ms}ms)',
   'onboard.key.fail': 'Test failed: {error}',
   'onboard.key.retry': 'Try again? [Y/n]: ',
+  'onboard.key.received': 'Key received: {masked} ({len} chars)',
+  'onboard.key.suspicious':
+    'Warning: the key looks incomplete or masked (contains …, spaces, or is very short). Copy it from the dialog shown right after creating it — the list only shows a masked version.',
+  'onboard.key.visible': 'This time the key will be shown while you paste so you can check it.',
+  'onboard.key.groqhint':
+    'On Groq: Create API Key → Submit → press Copy next to the key starting with gsk_ (shown only once).',
   'onboard.key.saved': 'Key saved to {file} (mode 600)',
   'onboard.local.unreachable': 'Local server not reachable at {url} — start it and retry',
   'onboard.model.title': 'Pick a model:',
