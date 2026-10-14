@@ -17,6 +17,7 @@ import { registerSessions } from './commands/sessions.js';
 import { registerMemory } from './commands/memory.js';
 import { registerSkills } from './commands/skills.js';
 import { registerUpdate } from './commands/update.js';
+import { registerBackground } from './commands/background.js';
 import { banner } from './render.js';
 
 const program = new Command();
@@ -45,6 +46,7 @@ registerDashboard(program);
 registerConfig(program);
 registerDoctor(program);
 registerUpdate(program);
+registerBackground(program);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
   const msg = err instanceof Error ? err.message : String(err);

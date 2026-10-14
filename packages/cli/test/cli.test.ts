@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tarballUrl } from '../src/commands/update.js';
+import { stepsFor } from '../src/commands/background.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
@@ -37,6 +38,13 @@ describe('dependency sync (bundle contract)', () => {
       'https://github.com/o/r/releases/download/dev/sindar-cli.tgz',
     );
   });
+
+  it('picks vendor-specific background steps', () => {
+    expect(stepsFor('HUAWEI')).toEqual(['battery', 'launch', 'sleep', 'data', 'lock']);
+    expect(stepsFor('Xiaomi')).toContain('autostart');
+    expect(stepsFor('samsung')).toContain('samsung');
+    expect(stepsFor('')).toEqual(['battery', 'data', 'lock']);
+  });
 });
 
 describe.skipIf(!hasBuild)('built binary', () => {
@@ -44,6 +52,21 @@ describe.skipIf(!hasBuild)('built binary', () => {
     const r = run(['--version']);
     expect(r.status).toBe(0);
     expect(r.stdout).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('background: guides on Termux, is a no-op elsewhere', () => {
+    const off = run(['background']);
+    expect(off.status).toBe(0);
+    expect(off.stdout).toMatch(/Termux/);
+    expect(off.stdout).not.toMatch(/1\/3/);
+    const termux = run(['--lang', 'en', 'background', '--no-open'], {
+      TERMUX_VERSION: '0.118.0',
+      PREFIX: '/data/data/com.termux/files/usr',
+    });
+    expect(termux.status).toBe(0);
+    expect(termux.stdout).toContain('Step 1/3');
+    expect(termux.stdout).toContain('Lock Termux in Recents');
+    expect(termux.stdout).toContain('sindar gateway restart');
   });
 
   it('runs doctor with --json in an isolated home and exits 0', () => {

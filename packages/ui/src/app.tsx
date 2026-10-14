@@ -20,6 +20,8 @@ import {
   currentId,
   staleUi,
   reloadApp,
+  stalled,
+  config,
 } from './lib/store.ts';
 import { normalizeUrl } from './lib/api.ts';
 import { t } from './lib/i18n.ts';
@@ -141,6 +143,9 @@ function Shell() {
         <button class="banner info" onClick={reloadApp}>
           ⬆️ {t(l, 'update.banner')}
         </button>
+      )}
+      {stalled.value && config.value?.platform.isTermux && (
+        <div class="banner warn">⏳ {t(l, 'stalled.banner')}</div>
       )}
       {otherPending.length > 0 && (
         <button class="banner info" onClick={() => openSession(otherPending[0]!.sessionId)}>

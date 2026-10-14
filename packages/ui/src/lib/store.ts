@@ -94,6 +94,22 @@ export const toast = signal<string | undefined>(undefined);
 export const version = signal<{ version: string; build: string } | undefined>(undefined);
 /** True when the gateway runs a newer build than this page (after `sindar update`). */
 export const staleUi = signal(false);
+/** A turn is running but nothing arrived for a while — on phones that usually means Android froze Termux. */
+export const stalled = signal(false);
+const STALL_MS = 30_000;
+let lastTurnActivity = 0;
+function touchTurn(): void {
+  lastTurnActivity = Date.now();
+  if (stalled.value) stalled.value = false;
+}
+const stallTimer = setInterval(() => {
+  if (!isRunning.value || socketStatus.value !== 'open') {
+    if (stalled.value) stalled.value = false;
+    return;
+  }
+  if (lastTurnActivity && Date.now() - lastTurnActivity > STALL_MS) stalled.value = true;
+}, 5000);
+(stallTimer as unknown as { unref?: () => void }).unref?.();
 
 const UI_BUILD: string = typeof __UI_BUILD__ === 'undefined' ? 'local' : __UI_BUILD__;
 const RELOAD_KEY = 'sindar.reloadedFor';
@@ -441,6 +457,7 @@ function handleMessage(msg: ServerMessage): void {
       running.value = new Set(msg.running);
       applyLang();
       checkUiBuild(msg.build);
+      touchTurn();
       // A reconnect may have missed the end of a turn: refresh what we show.
       if (currentId.value && !msg.running.includes(currentId.value) && currentAssistant) {
         void loadHistory(currentId.value);
@@ -450,6 +467,7 @@ function handleMessage(msg: ServerMessage): void {
     case 'turn_start': {
       setRunning(msg.sessionId, true);
       upsertSession(msg.session);
+      touchTurn();
       if (!rememberTurn(startedTurns, msg.turnId)) break;
       const mine = msg.clientRef && msg.clientRef === optimisticRef;
       if (mine) optimisticRef = undefined;
@@ -460,11 +478,13 @@ function handleMessage(msg: ServerMessage): void {
       break;
     }
     case 'event':
+      touchTurn();
       if (msg.sessionId !== currentId.value) break;
       if (!freshEvent(msg.turnId, msg.seq)) break;
       applyEvent(msg.event);
       break;
     case 'approval': {
+      touchTurn();
       pending.value = [...pending.value.filter((p) => p.id !== msg.approval.id), msg.approval];
       if (
         msg.approval.sessionId === currentId.value &&
@@ -485,6 +505,7 @@ function handleMessage(msg: ServerMessage): void {
     }
     case 'turn_end': {
       setRunning(msg.sessionId, false);
+      touchTurn();
       if (msg.sessionId !== currentId.value) break;
       if (!rememberTurn(endedTurns, msg.turnId)) break;
       const hadStream = Boolean(currentAssistant) || items.value.length > 0;
