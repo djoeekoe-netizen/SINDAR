@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SINDAR</string>
+    <string name="toast_termux_missing">Termux غير مثبّت — ثبّته من F-Droid أولاً.</string>
+    <string name="toast_termux_opened">فُتح Termux — اكتب: sindar gateway start</string>
+    <string name="toast_permission">اسمح لـ SINDAR بتشغيل الأوامر في Termux ثم اضغط مرة أخرى.</string>
+    <string name="toast_connected">تم الاتصال بالعقل ✓</string>
+    <string name="toast_bad_link">رابط الاتصال غير صالح.</string>
+    <string name="toast_downloading">جارٍ التنزيل…</string>
+</resources>

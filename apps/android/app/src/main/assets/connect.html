@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>SINDAR</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: #141a30;
+        --fg: #e7ecf7;
+        --muted: #93a0bd;
+        --accent: #6ee7b7;
+        --accent-fg: #06281c;
+        --line: #26304d;
+        --danger: #fb7185;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          16px/1.6 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          'Noto Naskh Arabic',
+          'Noto Sans Arabic',
+          sans-serif;
+      }
+      main {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: max(24px, env(safe-area-inset-top)) 20px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-height: 100vh;
+        justify-content: center;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 6px;
+      }
+      .logo svg {
+        width: 44px;
+        height: 44px;
+      }
+      .logo b {
+        font-size: 26px;
+        letter-spacing: 0.08em;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0;
+        text-align: center;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        text-align: center;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .btn {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: #1b2342;
+        color: var(--fg);
+        border-radius: 12px;
+        padding: 14px 16px;
+        font: inherit;
+        font-weight: 600;
+        width: 100%;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-fg);
+        border-color: transparent;
+      }
+      .btn:disabled {
+        opacity: 0.55;
+      }
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: #0f1530;
+        color: var(--fg);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font: inherit;
+        direction: ltr;
+        text-align: left;
+      }
+      label {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      code {
+        direction: ltr;
+        unicode-bidi: isolate;
+        display: inline-block;
+        background: #0f1530;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 15px;
+        color: var(--accent);
+      }
+      .status {
+        min-height: 24px;
+        text-align: center;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .status.ok {
+        color: var(--accent);
+      }
+      .status.bad {
+        color: var(--danger);
+      }
+      .link {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        text-decoration: underline;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        padding: 6px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .steps {
+        margin: 0;
+        padding: 0 18px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      [dir='ltr'] .steps {
+        padding: 0 0 0 18px;
+      }
+      .steps li + li {
+        margin-top: 6px;
+      }
+      .ver {
+        text-align: center;
+        font-size: 12px;
+        color: #5c6886;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo">
+        <svg viewBox="0 0 108 108" aria-hidden="true">
+          <path
+            fill="#6EE7B7"
+            d="M54,22 C56,40 60,46 78,48 C60,50 56,56 54,74 C52,56 48,50 30,48 C48,46 52,40 54,22 Z"
+          />
+          <path
+            fill="#A7F3D0"
+            d="M74,64 C75,70 76,72 82,73 C76,74 75,76 74,82 C73,76 72,74 66,73 C72,72 73,70 74,64 Z"
+          />
+        </svg>
+        <b>SINDAR</b>
+      </div>
+
+      <!-- ===== offline: the brain is known but not answering ===== -->
+      <section id="offline" class="hidden">
+        <h1 data-i18n="off.title"></h1>
+        <p data-i18n="off.text"></p>
+        <div class="card" style="margin-top: 12px">
+          <button class="btn primary" id="btnStart" data-i18n="off.start"></button>
+          <button class="btn" id="btnRetry" data-i18n="off.retry"></button>
+          <button class="btn" id="btnTermux" data-i18n="off.termux"></button>
+          <div class="status" id="status"></div>
+        </div>
+        <p style="font-size: 13px; margin-top: 10px" data-i18n="off.manual"></p>
+        <p style="margin-top: 6px"><code>sindar gateway start</code></p>
+        <div class="row" style="margin-top: 8px">
+          <button class="link" id="btnChange" data-i18n="off.change"></button>
+          <button class="link" id="btnLang1">English</button>
+        </div>
+      </section>
+
+      <!-- ===== connect: nothing saved yet ===== -->
+      <section id="connect" class="hidden">
+        <h1 data-i18n="con.title"></h1>
+        <p data-i18n="con.text"></p>
+        <div class="card" style="margin-top: 12px">
+          <ol class="steps">
+            <li data-i18n="con.step1"></li>
+            <li>
+              <span data-i18n="con.step2"></span>
+              <code>sindar app connect</code>
+            </li>
+            <li data-i18n="con.step3"></li>
+          </ol>
+          <button class="btn primary" id="btnOpenTermux" data-i18n="con.openTermux"></button>
+        </div>
+        <details>
+          <summary
+            class="link"
+            style="text-align: center; list-style: none"
+            data-i18n="con.manual"
+          ></summary>
+          <div class="card" style="margin-top: 10px">
+            <label
+              ><span data-i18n="con.url"></span>
+              <input id="url" type="url" inputmode="url" autocapitalize="off" autocomplete="off" />
+            </label>
+            <label
+              ><span data-i18n="con.token"></span>
+              <input id="token" type="password" autocapitalize="off" autocomplete="off" />
+            </label>
+            <button class="btn" id="btnSave" data-i18n="con.save"></button>
+            <div class="status bad" id="saveStatus"></div>
+          </div>
+        </details>
+        <div class="row" style="margin-top: 8px">
+          <span class="ver" id="ver"></span>
+          <button class="link" id="btnLang2">English</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      (function () {
+        var N = window.SindarNative;
+        var STR = {
+          ar: {
+            'off.title': 'العقل متوقف',
+            'off.text':
+              'SINDAR يحتاج أن يعمل عقله داخل Termux على هذا الهاتف. اضغط «تشغيل العقل» وسيُفتح التطبيق تلقائيًا عندما يجهز.',
+            'off.start': '▶️ تشغيل العقل',
+            'off.retry': '🔄 إعادة المحاولة',
+            'off.termux': 'فتح Termux',
+            'off.manual': 'لو لم ينجح الزر، افتح Termux واكتب:',
+            'off.change': 'تغيير الاتصال',
+            's.starting': 'جارٍ تشغيل العقل…',
+            's.waiting': 'بانتظار العقل… ({n} ث)',
+            's.up': 'العقل يعمل ✓',
+            's.timeout': 'لم يستجب العقل. افتح Termux واكتب: sindar gateway start',
+            's.permission':
+              'اسمح لـ SINDAR بتشغيل الأوامر في Termux، ثم اضغط «تشغيل العقل» مرة أخرى.',
+            's.denied': 'بدون هذا الإذن لا يستطيع التطبيق تشغيل العقل — شغّله من Termux.',
+            's.missing': 'Termux غير مثبّت على هذا الهاتف.',
+            'con.title': 'أهلًا بك في SINDAR',
+            'con.text': 'التطبيق يحتاج أن يتعرّف على عقله أولًا. الطريقة الأسهل:',
+            'con.step1': 'افتح Termux.',
+            'con.step2': 'اكتب الأمر:',
+            'con.step3': 'سيعود SINDAR إلى هنا متصلًا.',
+            'con.openTermux': 'فتح Termux',
+            'con.manual': 'الاتصال بعقل على جهاز آخر (إدخال يدوي)',
+            'con.url': 'عنوان العقل',
+            'con.token': 'رمز الدخول (من sindar gateway token)',
+            'con.save': 'اتصال',
+            'con.bad': 'العنوان أو الرمز غير صحيح.',
+          },
+          en: {
+            'off.title': 'The brain is off',
+            'off.text':
+              'SINDAR needs its brain running inside Termux on this phone. Tap “Start the brain” — the app opens by itself once it is ready.',
+            'off.start': '▶️ Start the brain',
+            'off.retry': '🔄 Try again',
+            'off.termux': 'Open Termux',
+            'off.manual': 'If the button does not work, open Termux and type:',
+            'off.change': 'Change connection',
+            's.starting': 'Starting the brain…',
+            's.waiting': 'Waiting for the brain… ({n}s)',
+            's.up': 'The brain is up ✓',
+            's.timeout': 'No answer. Open Termux and type: sindar gateway start',
+            's.permission':
+              'Allow SINDAR to run commands in Termux, then tap “Start the brain” again.',
+            's.denied':
+              'Without that permission the app cannot start the brain — start it from Termux.',
+            's.missing': 'Termux is not installed on this phone.',
+            'con.title': 'Welcome to SINDAR',
+            'con.text': 'The app needs to find its brain first. Easiest way:',
+            'con.step1': 'Open Termux.',
+            'con.step2': 'Type:',
+            'con.step3': 'SINDAR comes back here, connected.',
+            'con.openTermux': 'Open Termux',
+            'con.manual': 'Connect to a brain on another device (manual)',
+            'con.url': 'Brain address',
+            'con.token': 'Access token (from sindar gateway token)',
+            'con.save': 'Connect',
+            'con.bad': 'Address or token is not valid.',
+          },
+        };
+        var lang = 'ar';
+        try {
+          var saved = localStorage.getItem('sindar.lang');
+          if (saved === 'en' || saved === 'ar') lang = saved;
+          else if (N && N.lang && N.lang() !== 'ar') lang = 'en';
+        } catch (e) {}
+
+        function t(k, vars) {
+          var s = (STR[lang] && STR[lang][k]) || STR.en[k] || k;
+          if (vars)
+            Object.keys(vars).forEach(function (v) {
+              s = s.replace('{' + v + '}', vars[v]);
+            });
+          return s;
+        }
+        function applyLang() {
+          document.documentElement.lang = lang;
+          document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+          var nodes = document.querySelectorAll('[data-i18n]');
+          for (var i = 0; i < nodes.length; i++)
+            nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+          var other = lang === 'ar' ? 'English' : 'العربية';
+          document.getElementById('btnLang1').textContent = other;
+          document.getElementById('btnLang2').textContent = other;
+        }
+        function toggleLang() {
+          lang = lang === 'ar' ? 'en' : 'ar';
+          try {
+            localStorage.setItem('sindar.lang', lang);
+          } catch (e) {}
+          applyLang();
+        }
+        var $ = function (id) {
+          return document.getElementById(id);
+        };
+        var mode = location.hash === '#offline' ? 'offline' : 'connect';
+        function show(m) {
+          mode = m;
+          $('offline').classList.toggle('hidden', m !== 'offline');
+          $('connect').classList.toggle('hidden', m !== 'connect');
+        }
+        function setStatus(text, cls) {
+          var el = $('status');
+          el.textContent = text || '';
+          el.className = 'status' + (cls ? ' ' + cls : '');
+        }
+
+        // ---- wire up
+        $('btnLang1').onclick = toggleLang;
+        $('btnLang2').onclick = toggleLang;
+        $('btnStart').onclick = function () {
+          if (!N) return;
+          setStatus(t('s.starting'));
+          $('btnStart').disabled = true;
+          N.startBrain();
+        };
+        $('btnRetry').onclick = function () {
+          if (N) N.retry();
+        };
+        $('btnTermux').onclick = function () {
+          if (N) N.openTermux();
+        };
+        $('btnOpenTermux').onclick = function () {
+          if (N) N.openTermux();
+        };
+        $('btnChange').onclick = function () {
+          prefill();
+          show('connect');
+          var d = document.querySelector('details');
+          if (d) d.open = true;
+        };
+        $('btnSave').onclick = function () {
+          var url = $('url').value.trim();
+          var token = $('token').value.trim();
+          var ok = N && N.saveConnection(url, token);
+          $('saveStatus').textContent = ok ? '' : t('con.bad');
+        };
+        function prefill() {
+          var c = null;
+          try {
+            c = N && N.getConnection ? JSON.parse(N.getConnection() || 'null') : null;
+          } catch (e) {}
+          $('url').value =
+            (c && c.url) || (N && N.localUrl ? N.localUrl() : 'http://127.0.0.1:18789');
+          $('token').value = (c && c.token) || '';
+        }
+
+        window.addEventListener('sindar:brain', function (ev) {
+          var st = String(ev.detail || '');
+          var startBtn = $('btnStart');
+          if (st === 'starting') setStatus(t('s.starting'));
+          else if (st.indexOf('waiting:') === 0) setStatus(t('s.waiting', { n: st.slice(8) }));
+          else if (st === 'up') setStatus(t('s.up'), 'ok');
+          else if (st === 'timeout') {
+            setStatus(t('s.timeout'), 'bad');
+            startBtn.disabled = false;
+          } else if (st === 'permission') {
+            setStatus(t('s.permission'));
+            startBtn.disabled = false;
+          } else if (st === 'denied') {
+            setStatus(t('s.denied'), 'bad');
+            startBtn.disabled = false;
+          } else if (st === 'missing') {
+            setStatus(t('s.missing'), 'bad');
+            startBtn.disabled = false;
+          }
+        });
+
+        // Offline mode: quietly ask the app to re-check the brain every few seconds
+        // (it navigates home by itself when the brain answers).
+        setInterval(function () {
+          if (mode === 'offline' && N && N.ping) N.ping();
+        }, 4000);
+
+        try {
+          $('ver').textContent = N && N.version ? 'v' + N.version() : '';
+        } catch (e) {}
+        prefill();
+        applyLang();
+        show(mode);
+      })();
+    </script>
+  </body>
+</html>

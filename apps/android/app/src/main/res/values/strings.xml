@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SINDAR</string>
+    <string name="toast_termux_missing">Termux is not installed — install it from F-Droid first.</string>
+    <string name="toast_termux_opened">Termux opened — run: sindar gateway start</string>
+    <string name="toast_permission">Allow SINDAR to run commands in Termux, then tap again.</string>
+    <string name="toast_connected">Connected to the brain ✓</string>
+    <string name="toast_bad_link">Invalid connection link.</string>
+    <string name="toast_downloading">Downloading…</string>
+</resources>

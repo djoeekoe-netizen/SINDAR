@@ -333,6 +333,17 @@ export const ar = {
   'doctor.telegram.notoken':
     'تيليجرام: مفعّل لكن التوكن غير موجود ({env}) — شغّل: sindar telegram setup',
   'doctor.telegram.off': 'تيليجرام: غير مفعّل (اختياري — sindar telegram setup)',
+  // ---- app (Android shell) ----
+  'app.external.enabled': 'سُمح لتطبيق SINDAR بتشغيل العقل من خارج Termux (allow-external-apps).',
+  'app.opening': 'جارٍ فتح تطبيق SINDAR…',
+  'app.opened': 'أُرسلت بيانات الاتصال إلى التطبيق ✓ — افتحه من الشاشة الرئيسية.',
+  'app.missing': 'تطبيق SINDAR غير مثبّت على هذا الهاتف. نزّله من هنا ثم ثبّته:',
+  'app.link': 'رابط الاتصال (افتحه من الهاتف نفسه أو الصقه في التطبيق):',
+  'app.notTermux':
+    'هذا الأمر مخصص لهاتف أندرويد فيه Termux. على الكمبيوتر استخدم: sindar dashboard',
+  'app.install.title': 'تطبيق SINDAR لأندرويد (نسخة تجريبية):',
+  'app.install.hint': 'بعد التثبيت اكتب في Termux: sindar app connect',
+  'app.unknown': 'أمر غير معروف: {action} — المتاح: connect | link | install',
   'common.yes': 'نعم',
   'common.no': 'لا',
   'common.cancelled': 'أُلغي',

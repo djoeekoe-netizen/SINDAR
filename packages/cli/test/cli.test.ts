@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tarballUrl } from '../src/commands/update.js';
 import { stepsFor } from '../src/commands/background.js';
+import { connectLink, enableExternalApps } from '../src/commands/app.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
@@ -37,6 +38,31 @@ describe('dependency sync (bundle contract)', () => {
     expect(tarballUrl('o/r', 'dev')).toBe(
       'https://github.com/o/r/releases/download/dev/sindar-cli.tgz',
     );
+  });
+
+  it('app: builds the deep link and enables allow-external-apps idempotently', () => {
+    expect(connectLink('http://127.0.0.1:18789', 'a b&c')).toBe(
+      'sindar://connect?url=http%3A%2F%2F127.0.0.1%3A18789&token=a%20b%26c',
+    );
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-app-'));
+    const file = path.join(tmpHome, '.termux', 'termux.properties');
+    // 1) no file yet → created with the line
+    expect(enableExternalApps(tmpHome)).toEqual({ changed: true, file });
+    expect(fs.readFileSync(file, 'utf8')).toMatch(/^allow-external-apps = true$/m);
+    // 2) already enabled → untouched
+    expect(enableExternalApps(tmpHome).changed).toBe(false);
+    // 3) Termux's default commented line (and a false value) get replaced, other lines survive
+    fs.writeFileSync(file, 'extra-keys = [[ESC]]\n# allow-external-apps = true\n');
+    expect(enableExternalApps(tmpHome).changed).toBe(true);
+    let text = fs.readFileSync(file, 'utf8');
+    expect(text).toContain('extra-keys = [[ESC]]');
+    expect(text.match(/allow-external-apps/g)).toHaveLength(1);
+    expect(text).toMatch(/^allow-external-apps = true$/m);
+    fs.writeFileSync(file, 'allow-external-apps=false\n');
+    expect(enableExternalApps(tmpHome).changed).toBe(true);
+    text = fs.readFileSync(file, 'utf8');
+    expect(text.trim()).toBe('allow-external-apps = true');
+    fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
   it('picks vendor-specific background steps', () => {
@@ -193,6 +219,17 @@ describe.skipIf(!hasBuild)('chat / onboard / config (mock provider)', () => {
     expect(r.stderr).toContain('no API key');
     expect(r.stderr).toContain('sindar onboard');
     run(['config', 'set', 'model.default', 'mock:echo'], env);
+  });
+
+  it('app install prints the APK link without opening anything', () => {
+    const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-home-'));
+    const r = run(['--home', tmpHome, 'app', 'install', '--no-open']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('releases/download/dev/SINDAR-dev.apk');
+    expect(r.stdout).toContain('sindar app connect');
+    const bad = run(['--home', tmpHome, 'app', 'nonsense', '--no-open']);
+    expect(bad.status).toBe(2);
+    fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
   it('telegram: status/approve/on/off work without a running gateway', () => {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A four-point spark on the launcher background (safe zone: inner 72dp of 108dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#6EE7B7"
+        android:pathData="M54,22 C56,40 60,46 78,48 C60,50 56,56 54,74 C52,56 48,50 30,48 C48,46 52,40 54,22 Z" />
+    <path
+        android:fillColor="#A7F3D0"
+        android:pathData="M74,64 C75,70 76,72 82,73 C76,74 75,76 74,82 C73,76 72,74 66,73 C72,72 73,70 74,64 Z" />
+</vector>

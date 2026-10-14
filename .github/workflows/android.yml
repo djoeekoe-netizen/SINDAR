@@ -1,0 +1,61 @@
+name: Android app
+
+# Builds the Android shell (apps/android) and attaches SINDAR-dev.apk to the rolling
+# "dev" pre-release. Phones cannot build APKs, so this is the only build path.
+on:
+  push:
+    branches: ['main', 'arena/**']
+    paths:
+      - 'apps/android/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Build signed release APK
+        env:
+          # Optional real keystore (M9). Without these the public dev key in apps/android/keystore is used.
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          ARGS=(-Psindar.versionCode="$RUN_NUMBER" -Psindar.versionName="0.1.0-dev.$RUN_NUMBER")
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            ARGS+=(-Psindar.keystore="$RUNNER_TEMP/release.p12" -Psindar.storePassword="$KS_PASS")
+            ARGS+=(-Psindar.keyAlias="${KS_ALIAS:-sindar}" -Psindar.keyPassword="${KS_KEY_PASS:-$KS_PASS}")
+          fi
+          gradle -p apps/android assembleRelease --no-daemon --stacktrace "${ARGS[@]}"
+          cp apps/android/app/build/outputs/apk/release/app-release.apk SINDAR-dev.apk
+          ls -la SINDAR-dev.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SINDAR-dev.apk
+          path: SINDAR-dev.apk
+      - name: Attach to the rolling "dev" pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view dev >/dev/null 2>&1; then
+            gh release create dev --prerelease --title "SINDAR dev build" --notes "Rolling development build"
+          fi
+          gh release upload dev SINDAR-dev.apk --clobber

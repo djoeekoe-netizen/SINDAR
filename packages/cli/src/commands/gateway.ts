@@ -274,7 +274,15 @@ export function registerGateway(program: Command): void {
       const g = cmd.optsWithGlobals<{ home?: string; lang?: string }>();
       const app = await bootstrap({ home: g.home, lang: g.lang });
       try {
-        await runForeground(app, opts.host, opts.port ? Number.parseInt(opts.port, 10) : undefined);
+        const port = opts.port ? Number.parseInt(opts.port, 10) : undefined;
+        // Idempotent: the Android app fires `gateway run` blindly through Termux; if a gateway
+        // already answers on this port just say so instead of failing with EADDRINUSE.
+        const url = gatewayUrl(app, opts.host, port);
+        if (await fetchHealth(url)) {
+          process.stdout.write(`${pc.green(t(app.lang, 'gateway.already', { url }))}\n`);
+          return;
+        }
+        await runForeground(app, opts.host, port);
       } finally {
         await app.close();
       }

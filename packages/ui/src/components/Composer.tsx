@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { cancelTurn, isRunning, lang, sendMessage, socketStatus } from '../lib/store.ts';
 import { t } from '../lib/i18n.ts';
+import { takeDraftFromUrl } from '../lib/native.ts';
 
 const isTouch = () => typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
 
@@ -18,6 +19,24 @@ export function Composer() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
   useEffect(resize, [text]);
+
+  // Text shared into the app: `?draft=` on first load, `sindar:draft` events while running.
+  useEffect(() => {
+    const apply = (draft: string | undefined) => {
+      if (!draft) return;
+      setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${draft}` : draft));
+      requestAnimationFrame(() => {
+        const el = ta.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+    };
+    apply(takeDraftFromUrl());
+    const onDraft = (e: Event) => apply(String((e as CustomEvent<unknown>).detail ?? '').trim());
+    window.addEventListener('sindar:draft', onDraft);
+    return () => window.removeEventListener('sindar:draft', onDraft);
+  }, []);
 
   const submit = () => {
     // Read from the element so a fast Enter right after typing never sends stale state.

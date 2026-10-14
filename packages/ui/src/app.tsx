@@ -22,8 +22,10 @@ import {
   reloadApp,
   stalled,
   config,
+  showToast,
 } from './lib/store.ts';
 import { normalizeUrl } from './lib/api.ts';
+import { isLocalBrain, native } from './lib/native.ts';
 import { t } from './lib/i18n.ts';
 import { ConnectScreen } from './components/ConnectScreen.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
@@ -64,6 +66,19 @@ export function App() {
     };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('online', wakeSocket);
+    // The Android shell reports what the brain is doing after "start the brain".
+    const onBrain = (e: Event) => {
+      const st = String((e as CustomEvent<unknown>).detail ?? '');
+      const l = lang.value;
+      if (st === 'starting') showToast(t(l, 'brain.starting'), 4000);
+      else if (st === 'up') {
+        showToast(t(l, 'brain.up'));
+        wakeSocket();
+      } else if (st === 'timeout') showToast(t(l, 'brain.timeout'), 6000);
+      else if (st === 'permission' || st === 'denied') showToast(t(l, 'brain.permission'), 6000);
+      else if (st === 'missing') showToast(t(l, 'brain.missing'), 6000);
+    };
+    window.addEventListener('sindar:brain', onBrain);
 
     (async () => {
       const saved = conn.value;
@@ -83,6 +98,7 @@ export function App() {
       mq.removeEventListener('change', onMq);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('online', wakeSocket);
+      window.removeEventListener('sindar:brain', onBrain);
     };
   }, []);
 
@@ -100,6 +116,8 @@ function Shell() {
   const status = socketStatus.value;
   const title = currentSession.value?.title || t(l, 'app.name');
   const otherPending = pending.value.filter((p) => p.sessionId !== currentId.value);
+  const app = native();
+  const localBrain = isLocalBrain(conn.value?.url);
   return (
     <div class="shell">
       <header class="topbar">
@@ -139,14 +157,30 @@ function Shell() {
           ＋
         </button>
       </header>
-      {status !== 'open' && <div class="banner warn">{t(l, 'offline.banner')}</div>}
+      {status !== 'open' && (
+        <div class="banner warn">
+          {app && localBrain ? t(l, 'offline.banner.app') : t(l, 'offline.banner')}
+          {app && localBrain && (
+            <button class="btn small banner-btn" onClick={() => app.startBrain()}>
+              ▶️ {t(l, 'brain.start')}
+            </button>
+          )}
+        </div>
+      )}
       {staleUi.value && (
         <button class="banner info" onClick={reloadApp}>
           ⬆️ {t(l, 'update.banner')}
         </button>
       )}
       {stalled.value && config.value?.platform.isTermux && (
-        <div class="banner warn">⏳ {t(l, 'stalled.banner')}</div>
+        <div class="banner warn">
+          ⏳ {t(l, 'stalled.banner')}
+          {app && localBrain && (
+            <button class="btn small banner-btn" onClick={() => app.openTermux()}>
+              {t(l, 'brain.openTermux')}
+            </button>
+          )}
+        </div>
       )}
       {otherPending.length > 0 && (
         <button class="banner info" onClick={() => openSession(otherPending[0]!.sessionId)}>

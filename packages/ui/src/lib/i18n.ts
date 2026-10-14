@@ -24,6 +24,15 @@ const ar = {
   'offline.banner':
     'انقطع الاتصال بالعقل — سأعيد المحاولة تلقائياً. إن أغلقت Termux افتحه وشغّل: sindar gateway start',
   'update.banner': 'وصلت نسخة أحدث من الواجهة — اضغط للتحديث.',
+  'offline.banner.app':
+    'انقطع الاتصال بالعقل — سأعيد المحاولة تلقائياً. إن كان متوقفاً اضغط «تشغيل العقل».',
+  'brain.start': 'تشغيل العقل',
+  'brain.openTermux': 'فتح Termux',
+  'brain.starting': 'جارٍ تشغيل العقل في Termux…',
+  'brain.up': 'العقل يعمل ✓',
+  'brain.timeout': 'لم يستجب العقل. افتح Termux واكتب: sindar gateway start',
+  'brain.permission': 'اسمح لـ SINDAR بتشغيل الأوامر في Termux ثم حاول مرة أخرى.',
+  'brain.missing': 'Termux غير مثبّت على هذا الهاتف.',
   'stalled.banner':
     'العقل لا يرد منذ نصف دقيقة — غالباً أندرويد جمّد Termux في الخلفية. افتح Termux لحظة ليكمل، ولحل ذلك نهائياً اكتب فيه: sindar background',
   'sessions.title': 'المحادثات',
@@ -262,6 +271,15 @@ const en: Record<Key, string> = {
   'offline.banner':
     'Lost the connection to the brain — retrying automatically. If you closed Termux, open it and run: sindar gateway start',
   'update.banner': 'A newer version of the app is available — tap to refresh.',
+  'offline.banner.app':
+    'Lost the connection to the brain — retrying automatically. If it is off, tap “Start the brain”.',
+  'brain.start': 'Start the brain',
+  'brain.openTermux': 'Open Termux',
+  'brain.starting': 'Starting the brain in Termux…',
+  'brain.up': 'The brain is up ✓',
+  'brain.timeout': 'No answer from the brain. Open Termux and type: sindar gateway start',
+  'brain.permission': 'Allow SINDAR to run commands in Termux, then try again.',
+  'brain.missing': 'Termux is not installed on this phone.',
   'stalled.banner':
     'No answer for 30 s — Android has probably frozen Termux in the background. Open Termux for a moment to resume; to fix it for good run there: sindar background',
   'sessions.title': 'Chats',

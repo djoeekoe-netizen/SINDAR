@@ -334,6 +334,18 @@ export const en: Record<keyof typeof ar, string> = {
   'doctor.telegram.ok': 'Telegram: enabled, token present ({env})',
   'doctor.telegram.notoken': 'Telegram: enabled but no token ({env}) — run: sindar telegram setup',
   'doctor.telegram.off': 'Telegram: not set up (optional — sindar telegram setup)',
+  // ---- app (Android shell) ----
+  'app.external.enabled':
+    'The SINDAR app may now start the brain from outside Termux (allow-external-apps).',
+  'app.opening': 'Opening the SINDAR app…',
+  'app.opened': 'Connection handed to the app ✓ — open it from your home screen.',
+  'app.missing': 'The SINDAR app is not installed on this phone. Download and install it from:',
+  'app.link': 'Connection link (open it on this phone, or paste it into the app):',
+  'app.notTermux':
+    'This command is for an Android phone with Termux. On a computer use: sindar dashboard',
+  'app.install.title': 'SINDAR for Android (preview build):',
+  'app.install.hint': 'After installing, type in Termux: sindar app connect',
+  'app.unknown': 'Unknown action: {action} — use: connect | link | install',
   'common.yes': 'yes',
   'common.no': 'no',
   'common.cancelled': 'cancelled',

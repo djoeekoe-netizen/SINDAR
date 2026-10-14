@@ -331,6 +331,11 @@ pre {
   background: color-mix(in srgb, var(--accent) 18%, var(--panel));
   color: var(--text);
 }
+.banner .banner-btn {
+  display: inline-block;
+  margin-inline-start: 10px;
+  vertical-align: middle;
+}
 
 /* ---- chat ---- */
 .chat-wrap {

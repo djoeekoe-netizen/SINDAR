@@ -56,6 +56,10 @@ jobs:
             echo '```bash'
             echo "curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/scripts/install.sh | bash"
             echo '```'
+            echo
+            echo "Android app (needs the brain installed in Termux on the same phone):"
+            echo
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/download/dev/SINDAR-dev.apk"
           } > notes.md
           if gh release view dev >/dev/null 2>&1; then
             gh release edit dev --prerelease --title "SINDAR dev build" --notes-file notes.md

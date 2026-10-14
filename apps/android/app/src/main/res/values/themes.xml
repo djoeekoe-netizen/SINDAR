@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SINDAR" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/sindar_bg</item>
+        <item name="android:statusBarColor">@color/sindar_bg</item>
+        <item name="android:navigationBarColor">@color/sindar_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">@color/sindar_accent</item>
+        <item name="colorAccent">@color/sindar_accent</item>
+    </style>
+</resources>
