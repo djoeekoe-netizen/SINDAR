@@ -178,7 +178,7 @@ export function createOpenAICompatProvider(
     signal?.addEventListener('abort', onAbort, { once: true });
     bump();
     try {
-      for await (const msg of parseSse(res.body)) {
+      for await (const msg of parseSse(res.body, ac.signal)) {
         if (ac.signal.aborted) break;
         bump();
         if (msg.data === '[DONE]') break;
@@ -240,6 +240,15 @@ export function createOpenAICompatProvider(
     } finally {
       if (idle) clearTimeout(idle);
       signal?.removeEventListener('abort', onAbort);
+    }
+    // The read loop ends quietly when the body is cancelled: report why instead of passing a
+    // truncated answer off as a complete one.
+    if (ac.signal.aborted) {
+      if (signal?.aborted) {
+        yield { type: 'done', finishReason: 'cancelled' };
+        return;
+      }
+      throw new ProviderError(`${r.id}: stream idle timeout`, 'network');
     }
 
     const toolCalls: ToolCall[] = [...calls.entries()]

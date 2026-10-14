@@ -76,9 +76,21 @@ describe('memory files', () => {
       );
       expect(add.isError).toBeFalsy();
       expect(fs.readFileSync(rt.paths.user, 'utf8')).toContain('- prefers short answers');
+      // Several facts in one call → one entry per line.
+      const multi = await memoryTool.execute(
+        {
+          action: 'add',
+          target: 'user',
+          text: '- works on a project called Sindar\n- speaks Arabic',
+        },
+        ctx,
+      );
+      expect(multi.content).toMatch(/saved to user as \[[^\]]+\], \[[^\]]+\]/);
       const list = await memoryTool.execute({ action: 'list', target: 'user' }, ctx);
       expect(list.content).toMatch(/USER \(\d+ entries/);
       expect(list.content).toContain('prefers short answers');
+      expect(list.content).toContain('works on a project called Sindar');
+      expect(list.content).toContain('speaks Arabic');
       const bad = await memoryTool.execute({ action: 'remove', target: 'user', id: 'zzz' }, ctx);
       expect(bad.isError).toBe(true);
       expect(memoryTool.classify!({ action: 'add', target: 'user' }, ctx).outsideWorkspace).toBe(

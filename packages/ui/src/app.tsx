@@ -18,6 +18,8 @@ import {
   wakeSocket,
   openSession,
   currentId,
+  staleUi,
+  reloadApp,
 } from './lib/store.ts';
 import { normalizeUrl } from './lib/api.ts';
 import { t } from './lib/i18n.ts';
@@ -135,6 +137,11 @@ function Shell() {
         </button>
       </header>
       {status !== 'open' && <div class="banner warn">{t(l, 'offline.banner')}</div>}
+      {staleUi.value && (
+        <button class="banner info" onClick={reloadApp}>
+          ⬆️ {t(l, 'update.banner')}
+        </button>
+      )}
       {otherPending.length > 0 && (
         <button class="banner info" onClick={() => openSession(otherPending[0]!.sessionId)}>
           🔐 {t(l, 'approval.pending.other')}

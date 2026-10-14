@@ -163,7 +163,7 @@ export function createAnthropicProvider(
     const blocks = new Map<number, { type: string; id?: string; name?: string; json: string }>();
     const toolCalls: ToolCall[] = [];
     try {
-      for await (const msg of parseSse(res.body)) {
+      for await (const msg of parseSse(res.body, signal)) {
         if (signal?.aborted) break;
         let ev: Record<string, unknown>;
         try {

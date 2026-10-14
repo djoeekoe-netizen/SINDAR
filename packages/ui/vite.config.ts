@@ -10,6 +10,9 @@ const GATEWAY = process.env.SINDAR_GATEWAY_URL ?? 'http://127.0.0.1:18789';
  */
 export default defineConfig({
   plugins: [preact()],
+  // Same stamp as the gateway (`SINDAR_BUILD_SHA` in CI) so the running page can tell when the
+  // brain was updated underneath it and reload itself.
+  define: { __UI_BUILD__: JSON.stringify(process.env.SINDAR_BUILD_SHA ?? 'local') },
   build: {
     outDir: fileURLToPath(new URL('../cli/ui', import.meta.url)),
     emptyOutDir: true,

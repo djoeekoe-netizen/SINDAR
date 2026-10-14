@@ -23,6 +23,7 @@ const ar = {
   'status.running': 'يعمل…',
   'offline.banner':
     'انقطع الاتصال بالعقل — سأعيد المحاولة تلقائياً. إن أغلقت Termux افتحه وشغّل: sindar gateway start',
+  'update.banner': 'وصلت نسخة أحدث من الواجهة — اضغط للتحديث.',
   'sessions.title': 'المحادثات',
   'sessions.new': 'محادثة جديدة',
   'sessions.empty': 'لا محادثات بعد — ابدأ واحدة!',
@@ -218,6 +219,7 @@ const en: Record<Key, string> = {
   'status.running': 'working…',
   'offline.banner':
     'Lost the connection to the brain — retrying automatically. If you closed Termux, open it and run: sindar gateway start',
+  'update.banner': 'A newer version of the app is available — tap to refresh.',
   'sessions.title': 'Chats',
   'sessions.new': 'New chat',
   'sessions.empty': 'No chats yet — start one!',

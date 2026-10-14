@@ -117,11 +117,17 @@ export interface SseMessage {
 /** Minimal Server-Sent-Events parser over a fetch body. */
 export async function* parseSse(
   body: ReadableStream<Uint8Array> | null,
+  signal?: AbortSignal,
 ): AsyncGenerator<SseMessage> {
   if (!body) return;
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buf = '';
+  // Aborting cancels the pending read right away (the stream then reports `done`), so callers
+  // never sit on a stalled connection waiting for the next chunk that may never come.
+  const cancel = () => void reader.cancel(signal?.reason).catch(() => undefined);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel, { once: true });
   const flush = (block: string): SseMessage | undefined => {
     let event: string | undefined;
     const data: string[] = [];
@@ -158,6 +164,7 @@ export async function* parseSse(
       if (msg) yield msg;
     }
   } finally {
+    signal?.removeEventListener('abort', cancel);
     reader.releaseLock();
   }
 }

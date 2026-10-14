@@ -14,13 +14,18 @@ export const memory = defineTool({
     'Long-term memory that survives across sessions. Two files: target "user" = who the user is and how they like to work',
     '(name, language, tone, projects, constraints); target "memory" = durable facts, decisions and project state.',
     'Save things the user would be annoyed to repeat ("I prefer short answers", "my project is X at ~/x").',
-    'Do NOT save transient details, secrets, or anything already in the files. Keep entries to one short line each.',
+    'Do NOT save transient details, secrets, or anything already in the files. Keep entries to one short line each;',
+    'when the user states several facts at once, save ALL of them (one per line in a single add).',
     'Actions: add (text, optional section) · replace (id, text) · remove (id) · list.',
   ].join(' '),
   parameters: z.object({
     action: z.enum(['add', 'replace', 'remove', 'list']),
     target: z.enum(['memory', 'user']).default('memory'),
-    text: z.string().max(600).optional().describe('Entry text (add/replace), one line'),
+    text: z
+      .string()
+      .max(600)
+      .optional()
+      .describe('Entry text (add/replace). For add, each non-empty line becomes its own entry'),
     id: z.string().optional().describe('Entry id from list (replace/remove)'),
     section: z
       .string()
@@ -45,11 +50,16 @@ export const memory = defineTool({
           };
         }
         case 'add': {
-          if (!args.text) return { content: 'error: text is required for add', isError: true };
-          const e = mem.add(args.target, args.text, args.section);
+          const lines = (args.text ?? '')
+            .split(/\r?\n/)
+            .map((l) => l.replace(/^\s*[-*•]\s+/, '').trim())
+            .filter(Boolean);
+          if (lines.length === 0)
+            return { content: 'error: text is required for add', isError: true };
+          const ids = lines.map((l) => mem.add(args.target, l, args.section).id);
           const st = mem.stats(args.target);
           return {
-            content: `saved to ${args.target} as [${e.id}] (${st.chars}/${st.limit} chars)`,
+            content: `saved to ${args.target} as ${ids.map((id) => `[${id}]`).join(', ')} (${st.chars}/${st.limit} chars)`,
           };
         }
         case 'replace': {

@@ -104,6 +104,50 @@ describe('openai-compat provider', () => {
     expect((body.tools as unknown[]).length).toBe(1);
   });
 
+  it('fails a stalled stream after the idle timeout instead of returning a truncated answer', async () => {
+    const stalled = () =>
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ choices: [{ delta: { content: 'partial' } }] })}\n\n`,
+            ),
+          );
+          // …and then nothing, ever.
+        },
+      });
+    const p = createOpenAICompatProvider(groq, {
+      fetch: fakeFetch(() => new Response(stalled(), { status: 200 })),
+      idleTimeoutMs: 40,
+    });
+    const events: string[] = [];
+    const started = Date.now();
+    await expect(
+      (async () => {
+        for await (const ev of p.chat({
+          model: 'llama',
+          messages: [{ role: 'user', content: 'hi' }],
+        }))
+          events.push(ev.type);
+      })(),
+    ).rejects.toMatchObject({ code: 'network', message: expect.stringMatching(/idle timeout/) });
+    expect(events).toEqual(['text']);
+    expect(Date.now() - started).toBeLessThan(2000);
+
+    // Cancelling while stalled ends the stream right away (no waiting for the next chunk).
+    const ctl = new AbortController();
+    const p2 = createOpenAICompatProvider(groq, {
+      fetch: fakeFetch(() => new Response(stalled(), { status: 200 })),
+      idleTimeoutMs: 5000,
+    });
+    setTimeout(() => ctl.abort(), 20);
+    const res = await collectChat(
+      p2.chat({ model: 'llama', messages: [{ role: 'user', content: 'hi' }] }, ctl.signal),
+    );
+    expect(res.finishReason).toBe('cancelled');
+    expect(res.text).toBe('partial');
+  });
+
   it('maps HTTP errors to ProviderError codes and retries without stream_options', async () => {
     const p401 = createOpenAICompatProvider(groq, {
       fetch: fakeFetch(

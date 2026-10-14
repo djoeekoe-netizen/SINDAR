@@ -92,6 +92,55 @@ export const skillsOpen = signal(false);
 export const modelPickerOpen = signal(false);
 export const toast = signal<string | undefined>(undefined);
 export const version = signal<{ version: string; build: string } | undefined>(undefined);
+/** True when the gateway runs a newer build than this page (after `sindar update`). */
+export const staleUi = signal(false);
+
+const UI_BUILD: string = typeof __UI_BUILD__ === 'undefined' ? 'local' : __UI_BUILD__;
+const RELOAD_KEY = 'sindar.reloadedFor';
+
+/** Reload the page to pick up a new UI build (asks the service worker to refresh first). */
+export function reloadApp(): void {
+  const done = () => location.reload();
+  try {
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker
+        .getRegistration()
+        .then((r) => r?.update())
+        .catch(() => undefined)
+        .finally(done);
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  done();
+}
+
+/**
+ * The PWA can stay alive for days on a phone; when the brain restarts on a newer build, the
+ * old page would keep running stale JavaScript. Reload once automatically (never mid-turn),
+ * and show a banner if that is not enough.
+ */
+function checkUiBuild(serverBuild: string): void {
+  if (UI_BUILD === 'local' || serverBuild === 'local' || serverBuild === UI_BUILD) {
+    staleUi.value = false;
+    return;
+  }
+  staleUi.value = true;
+  let already: string | null = null;
+  try {
+    already = sessionStorage.getItem(RELOAD_KEY);
+  } catch {
+    /* private mode */
+  }
+  if (already === serverBuild || isRunning.value) return;
+  try {
+    sessionStorage.setItem(RELOAD_KEY, serverBuild);
+  } catch {
+    /* ignore */
+  }
+  reloadApp();
+}
 
 export const currentSession = computed(() => sessions.value.find((s) => s.id === currentId.value));
 export const isRunning = computed(() =>
@@ -157,6 +206,8 @@ function push(item: Item): void {
 }
 
 function newAssistant(): AssistantItem {
+  // Never leave a previous bubble spinning forever.
+  finishAssistant();
   const a: AssistantItem = {
     kind: 'assistant',
     id: nid(),
@@ -320,6 +371,16 @@ function applyEvent(ev: EventDTO): void {
       notice('error', friendlyError(ev.message, ev.code));
       break;
     case 'done':
+      // The final text is authoritative: if a flaky connection made us miss or repeat a delta,
+      // snap the bubble back to what the gateway actually stored.
+      if (
+        currentAssistant &&
+        ev.text &&
+        currentAssistant.text.value &&
+        currentAssistant.text.value !== ev.text
+      ) {
+        currentAssistant.text.value = ev.text;
+      }
       finishAssistant();
       if (ev.finishReason === 'length') notice('warn', t(lang.value, 'notice.length'));
       else if (ev.finishReason === 'cancelled') notice('info', t(lang.value, 'chat.cancelled'));
@@ -347,6 +408,30 @@ function prettyJson(raw: string): string {
 
 let optimisticRef: string | undefined;
 
+/**
+ * Duplicate guard. Each turn's events carry a running `seq`; anything we already applied
+ * (a replayed frame, a second socket during a reconnect…) is dropped instead of rendered twice.
+ */
+const turnSeq = new Map<string, number>();
+const startedTurns = new Set<string>();
+const endedTurns = new Set<string>();
+
+function rememberTurn(set: Set<string>, id: string): boolean {
+  if (set.has(id)) return false;
+  if (set.size > 200) set.clear();
+  set.add(id);
+  return true;
+}
+
+function freshEvent(turnId: string, n: number | undefined): boolean {
+  if (n === undefined) return true;
+  const last = turnSeq.get(turnId) ?? 0;
+  if (n <= last) return false;
+  if (turnSeq.size > 200) turnSeq.clear();
+  turnSeq.set(turnId, n);
+  return true;
+}
+
 function handleMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'hello':
@@ -355,6 +440,7 @@ function handleMessage(msg: ServerMessage): void {
       pending.value = msg.pending;
       running.value = new Set(msg.running);
       applyLang();
+      checkUiBuild(msg.build);
       // A reconnect may have missed the end of a turn: refresh what we show.
       if (currentId.value && !msg.running.includes(currentId.value) && currentAssistant) {
         void loadHistory(currentId.value);
@@ -364,6 +450,7 @@ function handleMessage(msg: ServerMessage): void {
     case 'turn_start': {
       setRunning(msg.sessionId, true);
       upsertSession(msg.session);
+      if (!rememberTurn(startedTurns, msg.turnId)) break;
       const mine = msg.clientRef && msg.clientRef === optimisticRef;
       if (mine) optimisticRef = undefined;
       if (!currentId.value && mine) currentId.value = msg.sessionId;
@@ -373,11 +460,16 @@ function handleMessage(msg: ServerMessage): void {
       break;
     }
     case 'event':
-      if (msg.sessionId === currentId.value) applyEvent(msg.event);
+      if (msg.sessionId !== currentId.value) break;
+      if (!freshEvent(msg.turnId, msg.seq)) break;
+      applyEvent(msg.event);
       break;
     case 'approval': {
       pending.value = [...pending.value.filter((p) => p.id !== msg.approval.id), msg.approval];
-      if (msg.approval.sessionId === currentId.value) {
+      if (
+        msg.approval.sessionId === currentId.value &&
+        !items.value.some((it) => it.kind === 'approval' && it.id === msg.approval.id)
+      ) {
         finishAssistant();
         push({ kind: 'approval', id: msg.approval.id, approval: signal(msg.approval) });
       }
@@ -394,6 +486,7 @@ function handleMessage(msg: ServerMessage): void {
     case 'turn_end': {
       setRunning(msg.sessionId, false);
       if (msg.sessionId !== currentId.value) break;
+      if (!rememberTurn(endedTurns, msg.turnId)) break;
       const hadStream = Boolean(currentAssistant) || items.value.length > 0;
       finishAssistant();
       if (!msg.ok && msg.error) notice('error', friendlyError(msg.error.message, msg.error.code));

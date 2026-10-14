@@ -136,7 +136,7 @@ describe('gateway (mock provider)', () => {
 
   it('runs a turn over the websocket and persists the session', async () => {
     const ws = new WebSocket(`${gw.url.replace('http', 'ws')}/ws?token=${gw.token}`);
-    const { waitFor } = collect(ws);
+    const { msgs: frames, waitFor } = collect(ws);
     await new Promise((r) => ws.on('open', r));
     const hello = await waitFor((m) => m.type === 'hello');
     expect(hello.type === 'hello' && hello.config.language).toBe('ar');
@@ -148,6 +148,12 @@ describe('gateway (mock provider)', () => {
     const end = await waitFor((m) => m.type === 'turn_end');
     expect(end.type === 'turn_end' && end.ok).toBe(true);
     expect(end.type === 'turn_end' && end.text).toBe('echo: hello gateway');
+    // Every event of a turn is numbered so clients can drop duplicates after a reconnect.
+    const seqs = frames
+      .filter((m) => m.type === 'event' && m.sessionId === sessionId)
+      .map((m) => (m.type === 'event' ? m.seq : undefined));
+    expect(seqs.length).toBeGreaterThan(1);
+    expect(seqs).toEqual(seqs.map((_, i) => i + 1));
 
     const list = await json(api('/api/sessions'));
     expect(list.sessions[0].id).toBe(sessionId);

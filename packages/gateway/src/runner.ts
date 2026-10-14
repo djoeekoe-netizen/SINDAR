@@ -304,6 +304,7 @@ export class TurnManager {
 
     const done = (async () => {
       let usage: UsageDTO = { inputTokens: 0, outputTokens: 0 };
+      let seq = 0;
       try {
         const result = await runTurn(this.rt, {
           session: session!,
@@ -320,7 +321,7 @@ export class TurnManager {
               };
             }
             const dto = serializeEvent(ev);
-            if (dto) this.broadcast({ type: 'event', sessionId, turnId, event: dto });
+            if (dto) this.broadcast({ type: 'event', sessionId, turnId, seq: ++seq, event: dto });
           },
           requestApproval: (req) => this.requestApproval(sessionId, turnId, req),
         });

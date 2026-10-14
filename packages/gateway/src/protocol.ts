@@ -172,7 +172,14 @@ export type ServerMessage =
       /** The user message as stored (so other clients can render it). */
       text: string;
     }
-  | { type: 'event'; sessionId: string; turnId: string; event: EventDTO }
+  | {
+      type: 'event';
+      sessionId: string;
+      turnId: string;
+      /** 1-based position inside the turn; lets clients drop duplicates after a reconnect. */
+      seq?: number;
+      event: EventDTO;
+    }
   | { type: 'approval'; approval: ApprovalDTO }
   | { type: 'approval_resolved'; id: string; answer: ApprovalAnswer }
   | {
