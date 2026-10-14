@@ -1,5 +1,12 @@
 import fs from 'node:fs';
-import { t, type AgentRuntime, type MessageKey, type PairingStore } from '@sindar/core';
+import {
+  BUILD,
+  VERSION,
+  t,
+  type AgentRuntime,
+  type MessageKey,
+  type PairingStore,
+} from '@sindar/core';
 import type { ApprovalAnswer, ApprovalDTO, FileRefDTO, ServerMessage } from '../../protocol.js';
 import type { TurnManager } from '../../runner.js';
 import {
@@ -348,6 +355,7 @@ export class TelegramChannel {
             session: session?.title ?? session?.id ?? '—',
             messages: session ? this.rt.store.count(session.id) : 0,
             state: this.tr(running ? 'tg.status.running' : 'tg.status.idle'),
+            version: `${VERSION} (${BUILD.slice(0, 7)})`,
           }),
         );
         return;

@@ -68,6 +68,12 @@ export interface GatewayOptions {
   channels?: boolean;
   /** Telegram transport overrides (tests inject a fake `fetch`). */
   telegram?: Omit<TelegramChannelOptions, 'token'>;
+  /**
+   * Called when an authenticated client asks the gateway to stop (`POST /api/shutdown`) —
+   * lets `sindar gateway stop|restart` and `sindar update` stop a brain they did not start
+   * (e.g. one launched by the Android app). The process owner decides how to exit.
+   */
+  onShutdown?: () => void;
 }
 
 export interface Gateway {
@@ -717,6 +723,14 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
     } catch (err) {
       return skillError(c, err);
     }
+  });
+
+  // ---- shutdown (token-protected like every /api route) ------------------
+  app.post('/api/shutdown', (c) => {
+    if (!opts.onShutdown) return c.json({ error: 'not supported by this process' }, 501);
+    rt.logger.info('shutdown requested over the API');
+    setTimeout(() => opts.onShutdown?.(), 50);
+    return c.json({ ok: true });
   });
 
   // ---- status -----------------------------------------------------------

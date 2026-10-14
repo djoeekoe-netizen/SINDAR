@@ -140,21 +140,74 @@ function printAccess(app: App, baseUrl: string, token: string, qr: boolean): voi
 }
 
 async function runForeground(app: App, host?: string, port?: number): Promise<void> {
-  const gw = await createGateway(app, { host, port, uiDir: defaultUiDir() });
   const out = (s = '') => process.stdout.write(`${s}\n`);
+  let stopping = false;
+  let stopNow: () => void = () => undefined;
+  const gw = await createGateway(app, {
+    host,
+    port,
+    uiDir: defaultUiDir(),
+    onShutdown: () => stopNow(),
+  });
+  // Own the pid file whoever started us (terminal, `sindar app connect`, the Android app), so
+  // `sindar gateway stop|restart` and `sindar update` can always find this process.
+  const files = gatewayFiles(app.paths.home, app.paths.logs);
+  const otherPid = readPid(files.pid);
+  if (!otherPid || otherPid === process.pid || !processAlive(otherPid)) {
+    try {
+      fs.mkdirSync(path.dirname(files.pid), { recursive: true });
+      fs.writeFileSync(files.pid, `${process.pid}\n`);
+    } catch {
+      /* ignore */
+    }
+  }
   out(pc.green(t(app.lang, 'gateway.started', { url: gw.url })));
   printAccess(app, gw.url, gw.token, false);
   out(pc.dim(t(app.lang, 'gateway.foreground.hint')));
   await new Promise<void>((resolve) => {
-    const stop = () => {
+    stopNow = () => {
+      if (stopping) return;
+      stopping = true;
       out(pc.dim(t(app.lang, 'gateway.stopping')));
       gw.close()
         .catch(() => undefined)
-        .finally(resolve);
+        .finally(() => {
+          if (readPid(files.pid) === process.pid) {
+            try {
+              fs.unlinkSync(files.pid);
+            } catch {
+              /* ignore */
+            }
+          }
+          resolve();
+        });
     };
-    process.once('SIGINT', stop);
-    process.once('SIGTERM', stop);
+    process.once('SIGINT', stopNow);
+    process.once('SIGTERM', stopNow);
   });
+}
+
+/** Ask a running gateway to exit through its API (works for brains we did not spawn). */
+async function requestShutdown(url: string, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/api/shutdown`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForDown(url: string, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (!(await fetchHealth(url, 800))) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return !(await fetchHealth(url, 800));
 }
 
 export async function ensureGatewayRunning(
@@ -199,11 +252,9 @@ export async function stopGateway(app: App): Promise<boolean> {
   const files = gatewayFiles(app.paths.home, app.paths.logs);
   const pid = readPid(files.pid);
   const url = gatewayUrl(app);
-  let stopped = false;
   if (pid && processAlive(pid)) {
     try {
       process.kill(pid, 'SIGTERM');
-      stopped = true;
     } catch {
       /* ignore */
     }
@@ -217,9 +268,11 @@ export async function stopGateway(app: App): Promise<boolean> {
       }
     }
   }
-  if (!stopped && (await fetchHealth(url))) {
-    // Running but not started by us (e.g. foreground in another terminal) — cannot stop it from here.
-    return false;
+  if (await fetchHealth(url)) {
+    // Still answering (started by someone else, or the pid file was stale): ask it to quit.
+    const token = process.env.SINDAR_GATEWAY_TOKEN ?? loadOrCreateToken(app.paths.home);
+    await requestShutdown(url, token);
+    if (!(await waitForDown(url, 10_000))) return false;
   }
   try {
     fs.unlinkSync(files.pid);
@@ -228,6 +281,23 @@ export async function stopGateway(app: App): Promise<boolean> {
   }
   if (app.platform.isTermux) execFile('termux-wake-unlock', [], () => undefined);
   return true;
+}
+
+/**
+ * Stop (if running) and start again — used by `gateway restart` and after `sindar update`.
+ * Returns what happened so callers can be honest with the user.
+ */
+export async function restartGateway(
+  app: App,
+): Promise<{ ok: boolean; url: string; token: string; health?: HealthDTO; wasRunning: boolean }> {
+  const url = gatewayUrl(app);
+  const wasRunning = Boolean(await fetchHealth(url));
+  if (wasRunning && !(await stopGateway(app))) {
+    const token = process.env.SINDAR_GATEWAY_TOKEN ?? loadOrCreateToken(app.paths.home);
+    return { ok: false, url, token, wasRunning };
+  }
+  const r = await ensureGatewayRunning(app);
+  return { ok: true, url: r.url, token: r.token, health: r.health, wasRunning };
 }
 
 export function registerGateway(program: Command): void {
@@ -309,8 +379,12 @@ export function registerGateway(program: Command): void {
       const g = cmd.optsWithGlobals<{ home?: string; lang?: string }>();
       const app = await bootstrap({ home: g.home, lang: g.lang });
       try {
-        await stopGateway(app);
-        const r = await ensureGatewayRunning(app);
+        const r = await restartGateway(app);
+        if (!r.ok) {
+          process.stdout.write(`${pc.yellow(t(app.lang, 'gateway.stop.foreign'))}\n`);
+          process.exitCode = 1;
+          return;
+        }
         process.stdout.write(`${pc.green(t(app.lang, 'gateway.started', { url: r.url }))}\n`);
         printAccess(app, r.url, r.token, false);
       } catch (err) {

@@ -4,7 +4,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tarballUrl } from '../src/commands/update.js';
+import {
+  fetchReleaseInfo,
+  parseVersionOutput,
+  sameBuild,
+  tarballUrl,
+  versionUrl,
+} from '../src/commands/update.js';
 import { stepsFor } from '../src/commands/background.js';
 import { connectLink, enableExternalApps } from '../src/commands/app.js';
 
@@ -38,6 +44,33 @@ describe('dependency sync (bundle contract)', () => {
     expect(tarballUrl('o/r', 'dev')).toBe(
       'https://github.com/o/r/releases/download/dev/sindar-cli.tgz',
     );
+    expect(versionUrl('o/r', 'dev')).toBe(
+      'https://github.com/o/r/releases/download/dev/version.json',
+    );
+  });
+
+  it('update: compares builds, parses --version output and tolerates offline release info', async () => {
+    expect(sameBuild('4271e31', '4271e31abcdef0123456789abcdef0123456789a')).toBe(true);
+    expect(sameBuild('4271e31', '4271e32')).toBe(false);
+    expect(sameBuild('local', 'local')).toBe(false); // too short to mean anything
+    expect(sameBuild(undefined, 'abc')).toBe(false);
+    expect(parseVersionOutput('0.1.0 (4271e31)\n')).toEqual({ version: '0.1.0', build: '4271e31' });
+    expect(parseVersionOutput('garbage')).toBeUndefined();
+
+    const okFetch = (async () =>
+      new Response(JSON.stringify({ version: '0.1.0', sha: 'abc1234def' }), {
+        status: 200,
+      })) as unknown as typeof fetch;
+    expect(await fetchReleaseInfo('https://x/version.json', 1000, okFetch)).toEqual({
+      version: '0.1.0',
+      sha: 'abc1234def',
+    });
+    const failFetch = (async () => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch;
+    expect(await fetchReleaseInfo('https://x/version.json', 1000, failFetch)).toBeUndefined();
+    const notFound = (async () => new Response('nope', { status: 404 })) as unknown as typeof fetch;
+    expect(await fetchReleaseInfo('https://x/version.json', 1000, notFound)).toBeUndefined();
   });
 
   it('app: builds the deep link and enables allow-external-apps idempotently', () => {

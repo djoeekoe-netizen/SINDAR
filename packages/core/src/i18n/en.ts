@@ -94,7 +94,18 @@ export const en: Record<keyof typeof ar, string> = {
   'doctor.summary.warn': 'Result: ready with {n} warning(s)',
   'doctor.summary.fail': 'Result: {n} problem(s) need fixing',
   'update.start': 'Updating SINDAR from the {channel} channel…',
-  'update.done': 'Updated. Run: sindar doctor',
+  'update.done': 'Updated to {version}.',
+  'update.uptodate': 'Already on the latest build ({version}).',
+  'update.unknown': 'unknown version',
+  'update.retry': 'The installed build is not the latest — downloading again…',
+  'update.mismatch':
+    'Note: the channel now publishes {build} but a different build got installed. Try again shortly: sindar update --force',
+  'update.gateway.down': 'The brain is not running. Start it with: sindar gateway start',
+  'update.gateway.current': 'The brain is running the new build ✓',
+  'update.gateway.restarting': 'The brain is still running the old build — restarting it…',
+  'update.gateway.restarted': 'Brain restarted on the new build ✓ ({build})',
+  'update.gateway.failed':
+    'Could not restart the brain automatically. Stop and start it: sindar gateway stop, then sindar gateway start',
   'update.fail': 'Update failed: {error}',
   'update.npm.missing': 'npm not found on PATH',
   'cli.hint':
@@ -217,7 +228,7 @@ export const en: Record<keyof typeof ar, string> = {
   'gateway.stopping': 'Stopping…',
   'gateway.stopped': 'SINDAR gateway stopped.',
   'gateway.stop.foreign':
-    'A gateway is running but was not started by me (another terminal?) — stop it there with Ctrl+C.',
+    'The server is running but I could not stop it (maybe an old build in another window) — press Ctrl+C there, then retry.',
   'gateway.start.failed': 'The gateway did not start. See the log: {log}',
   'gateway.status.up': 'running ✓ {url} (up {uptime})',
   'gateway.status.detail':
@@ -271,7 +282,8 @@ export const en: Record<keyof typeof ar, string> = {
   'tg.nothing_running': 'Nothing is running right now.',
   'tg.busy':
     '⏳ Still working on your previous request — send /stop to cancel it or wait a moment.',
-  'tg.status': 'Model: {model}\nChat: {session} ({messages} messages)\nState: {state}',
+  'tg.status':
+    'Model: {model}\nChat: {session} ({messages} messages)\nState: {state}\nVersion: {version}',
   'tg.status.running': 'running',
   'tg.status.idle': 'idle',
   'tg.model': 'Current model: {model}',

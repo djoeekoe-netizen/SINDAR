@@ -123,6 +123,34 @@ describe('gateway (mock provider)', () => {
     expect((await fetch(`${gw.url}/..%2F..%2Fetc%2Fpasswd`)).status).not.toBe(200);
   });
 
+  it('shutdown endpoint needs the token and a process owner', async () => {
+    expect((await fetch(`${gw.url}/api/shutdown`, { method: 'POST' })).status).toBe(401);
+    // this test gateway has no onShutdown hook → it says so instead of pretending
+    expect((await api('/api/shutdown', { method: 'POST' })).status).toBe(501);
+    let called = 0;
+    const own = await createGateway(rt, {
+      host: '127.0.0.1',
+      port: 0,
+      uiDir,
+      wakeLock: false,
+      channels: false,
+      onShutdown: () => {
+        called += 1;
+      },
+    });
+    try {
+      const res = await fetch(`${own.url}/api/shutdown`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${own.token}` },
+      });
+      expect(res.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 120));
+      expect(called).toBe(1);
+    } finally {
+      await own.close();
+    }
+  });
+
   it('rejects API calls and sockets without the token', async () => {
     expect((await fetch(`${gw.url}/api/sessions`)).status).toBe(401);
     expect((await fetch(`${gw.url}/api/sessions?token=wrong`)).status).toBe(401);

@@ -93,7 +93,18 @@ export const ar = {
   'doctor.summary.warn': 'النتيجة: جاهز مع {n} تنبيه',
   'doctor.summary.fail': 'النتيجة: {n} مشكلة تحتاج إصلاحاً',
   'update.start': 'جارٍ تحديث SINDAR من القناة {channel}…',
-  'update.done': 'تم التحديث. شغّل: sindar doctor',
+  'update.done': 'تم التحديث إلى {version}.',
+  'update.uptodate': 'أنت على أحدث نسخة أصلًا ({version}).',
+  'update.unknown': 'نسخة غير معروفة',
+  'update.retry': 'النسخة المثبتة ليست الأحدث — أعيد التنزيل من جديد…',
+  'update.mismatch':
+    'تنبيه: الإصدار المنشور الآن هو {build} لكن المثبت مختلف. جرّب بعد قليل: sindar update --force',
+  'update.gateway.down': 'العقل غير مشغّل الآن. لتشغيله: sindar gateway start',
+  'update.gateway.current': 'العقل يعمل بالنسخة الجديدة ✓',
+  'update.gateway.restarting': 'العقل ما زال يعمل بالنسخة القديمة — أعيد تشغيله…',
+  'update.gateway.restarted': 'أعيد تشغيل العقل بالنسخة الجديدة ✓ ({build})',
+  'update.gateway.failed':
+    'لم أستطع إعادة تشغيل العقل تلقائيًا. أوقفه ثم شغّله: sindar gateway stop ثم sindar gateway start',
   'update.fail': 'فشل التحديث: {error}',
   'update.npm.missing': 'npm غير موجود في المسار',
   'cli.hint':
@@ -216,7 +227,7 @@ export const ar = {
   'gateway.stopping': 'جارٍ الإيقاف…',
   'gateway.stopped': 'توقف خادم SINDAR.',
   'gateway.stop.foreign':
-    'الخادم يعمل لكن لم أبدأه أنا (ربما في نافذة أخرى) — أوقفه بـ Ctrl+C هناك.',
+    'الخادم يعمل لكن لم أستطع إيقافه (ربما نسخة قديمة في نافذة أخرى) — أوقفه بـ Ctrl+C هناك ثم أعد المحاولة.',
   'gateway.start.failed': 'لم يبدأ الخادم. انظر السجل: {log}',
   'gateway.status.up': 'يعمل ✓ {url} (منذ {uptime})',
   'gateway.status.detail':
@@ -269,7 +280,8 @@ export const ar = {
   'tg.stopped': '⏹ أوقفت التنفيذ.',
   'tg.nothing_running': 'لا يوجد شيء يعمل الآن.',
   'tg.busy': '⏳ ما زلت أعمل على طلبك السابق — أرسل /stop لإيقافه أو انتظر قليلاً.',
-  'tg.status': 'النموذج: {model}\nالمحادثة: {session} ({messages} رسالة)\nالحالة: {state}',
+  'tg.status':
+    'النموذج: {model}\nالمحادثة: {session} ({messages} رسالة)\nالحالة: {state}\nالإصدار: {version}',
   'tg.status.running': 'يعمل الآن',
   'tg.status.idle': 'جاهز',
   'tg.model': 'النموذج الحالي: {model}',
