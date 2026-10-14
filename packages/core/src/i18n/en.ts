@@ -186,6 +186,31 @@ export const en: Record<keyof typeof ar, string> = {
   'sessions.row': '{id}  {when}  {count} msgs  {model}  {title}',
   'sessions.notfound': 'No session with id: {id}',
   'sessions.deleted': 'Deleted session {id}',
+  'sessions.search.none': 'No past conversation matches "{q}"',
+  'sessions.search.title': 'Conversations matching "{q}":',
+  'memory.title': 'SINDAR memory',
+  'memory.file': '{name} — {entries} entries, {chars}/{limit} chars',
+  'memory.empty': '(empty)',
+  'memory.added': 'Saved to {target} as [{id}]',
+  'memory.removed': 'Removed [{id}]',
+  'memory.hint':
+    'Edit the files directly or use: sindar memory add "text" · sindar memory remove <id>',
+  'skills.title': 'Skills ({count}) — {dir}',
+  'skills.none':
+    'No skills yet. Create one: sindar skills create <name>  ·  install: sindar skills install github:owner/repo/path',
+  'skills.row': '{name}  v{version}  [{source}]  {description}',
+  'skills.notfound': 'No skill named "{name}"',
+  'skills.removed': 'Removed skill "{name}"',
+  'skills.created': 'Created skill "{name}" at {path}',
+  'skills.installed': 'Installed skill "{name}" from {origin}',
+  'skills.fetching': 'Fetching {source} from GitHub…',
+  'skills.warnings': 'Security scan found {count} warning(s):',
+  'skills.danger':
+    'Refused: dangerous content found. Review it and re-run with --yes to install anyway.',
+  'skills.scriptsNote':
+    'Scripts inside skills are never run automatically — the agent runs them through the terminal tool with your approval.',
+  'skills.mode':
+    'Skill auto-creation mode: {mode} (change with: sindar config set skills.autoCreate ask|auto|off)',
   'common.yes': 'yes',
   'common.no': 'no',
   'common.cancelled': 'cancelled',

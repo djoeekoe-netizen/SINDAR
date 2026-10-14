@@ -14,6 +14,8 @@ import { registerDashboard, registerGateway } from './commands/gateway.js';
 import { registerModel } from './commands/model.js';
 import { registerOnboard } from './commands/onboard.js';
 import { registerSessions } from './commands/sessions.js';
+import { registerMemory } from './commands/memory.js';
+import { registerSkills } from './commands/skills.js';
 import { registerUpdate } from './commands/update.js';
 import { banner } from './render.js';
 
@@ -36,6 +38,8 @@ registerChat(program);
 registerOnboard(program);
 registerModel(program);
 registerSessions(program);
+registerMemory(program);
+registerSkills(program);
 registerGateway(program);
 registerDashboard(program);
 registerConfig(program);

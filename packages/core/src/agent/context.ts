@@ -4,6 +4,7 @@ import type { Config, Lang } from '../config/schema.js';
 import type { SindarPaths } from '../paths.js';
 import type { PlatformInfo } from '../platform.js';
 import type { Tool } from '../tools/types.js';
+import { ensureBundledSkills } from '../skills/bundled.js';
 
 export const DEFAULT_SOUL = `# SOUL.md — شخصية SINDAR / SINDAR's personality
 
@@ -46,6 +47,7 @@ export function ensureIdentityFiles(paths: SindarPaths): string[] {
       created.push(file);
     }
   }
+  for (const name of ensureBundledSkills(paths.skills)) created.push(path.join(paths.skills, name));
   return created;
 }
 

@@ -27,6 +27,8 @@ import { ChatView } from './components/ChatView.tsx';
 import { Composer } from './components/Composer.tsx';
 import { ModelPicker } from './components/ModelPicker.tsx';
 import { Settings } from './components/Settings.tsx';
+import { MemoryPanel } from './components/MemoryPanel.tsx';
+import { SkillsPanel } from './components/SkillsPanel.tsx';
 
 /** Token handed over in the URL (`sindar dashboard` prints such a link). */
 function takeTokenFromUrl(): { token?: string; url?: string } {
@@ -143,6 +145,8 @@ function Shell() {
       <Sidebar />
       <ModelPicker />
       <Settings />
+      <MemoryPanel />
+      <SkillsPanel />
       {toast.value && <div class="toast">{toast.value}</div>}
     </div>
   );

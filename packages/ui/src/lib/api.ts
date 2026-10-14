@@ -2,10 +2,14 @@ import type {
   ApprovalAnswer,
   ApprovalDTO,
   HealthDTO,
+  MemoryFileDTO,
   MessageDTO,
   ModelsDTO,
   PublicConfigDTO,
+  ScanWarningDTO,
+  SearchResultDTO,
   SessionDTO,
+  SkillDTO,
 } from '../../../gateway/src/protocol.ts';
 
 export interface Connection {
@@ -141,5 +145,58 @@ export class Api {
       method: 'POST',
       body: JSON.stringify({ answer }),
     });
+  }
+
+  // ---- learning loop (M3) ----
+  memory() {
+    return this.req<{ files: MemoryFileDTO[] }>('/api/memory');
+  }
+  saveMemory(target: MemoryFileDTO['target'], content: string) {
+    return this.req<{ ok: true; file: MemoryFileDTO }>(`/api/memory/${target}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+  search(q: string, limit = 10) {
+    return this.req<{ query: string; results: SearchResultDTO[] }>(
+      `/api/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    );
+  }
+  skills() {
+    return this.req<{ skills: SkillDTO[]; mode: string; dir: string }>('/api/skills');
+  }
+  skill(name: string) {
+    return this.req<{ skill: SkillDTO }>(`/api/skills/${encodeURIComponent(name)}`);
+  }
+  createSkill(input: { name: string; description: string; body: string; tags?: string[] }) {
+    return this.req<{ skill: SkillDTO }>('/api/skills', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+  updateSkill(
+    name: string,
+    patch: { description?: string; body?: string; tags?: string[]; changelog?: string },
+  ) {
+    return this.req<{ skill: SkillDTO }>(`/api/skills/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    });
+  }
+  deleteSkill(name: string) {
+    return this.req<{ ok: true }>(`/api/skills/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  }
+  installSkill(input: { source: string; force?: boolean; overwrite?: boolean; dryRun?: boolean }) {
+    return this.req<{
+      installed?: Array<{ skill: SkillDTO; warnings: ScanWarningDTO[] }>;
+      preview?: Array<{
+        name: string;
+        origin: string;
+        files: string[];
+        warnings: ScanWarningDTO[];
+      }>;
+    }>('/api/skills/install', { method: 'POST', body: JSON.stringify(input) });
   }
 }

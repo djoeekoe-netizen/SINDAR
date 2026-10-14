@@ -40,7 +40,7 @@ export const ConfigSchema = z.object({
       workspace: z.string().optional(),
       maxIterations: z.number().int().positive().max(500).default(50),
       /** Tool groups exposed to the model. */
-      toolsets: z.array(z.string()).default(['files', 'terminal', 'web']),
+      toolsets: z.array(z.string()).default(['files', 'terminal', 'web', 'memory', 'skills']),
       /** Programs that may run without approval in `allowlist` mode (first word of the command). */
       allowlist: z
         .array(z.string())
@@ -71,6 +71,25 @@ export const ConfigSchema = z.object({
       maxToolOutputChars: z.number().int().positive().default(16_000),
       toolTimeoutS: z.number().int().positive().max(3600).default(120),
       temperature: z.number().min(0).max(2).optional(),
+    })
+    .prefault({}),
+  memory: z
+    .object({
+      /** Remind the model to save memories after this many user turns without a memory write (0 = off). */
+      nudgeEvery: z.number().int().min(0).max(100).default(8),
+      /** Size caps for MEMORY.md / USER.md (chars) — the model must consolidate beyond this. */
+      maxChars: z.number().int().positive().default(12_000),
+      userMaxChars: z.number().int().positive().default(6_000),
+    })
+    .prefault({}),
+  skills: z
+    .object({
+      /** ask = propose and wait for the user · auto = create silently after complex tasks · off. */
+      autoCreate: z.enum(['ask', 'auto', 'off']).default('ask'),
+      /** A turn with at least this many tool calls counts as a complex task worth a skill. */
+      reflectAfterToolCalls: z.number().int().min(1).default(6),
+      /** Extra skill directories (besides ~/.sindar/skills). */
+      extraDirs: z.array(z.string()).default([]),
     })
     .prefault({}),
   gateway: z

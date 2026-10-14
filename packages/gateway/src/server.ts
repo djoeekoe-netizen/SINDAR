@@ -15,17 +15,28 @@ import {
   resolveProviders,
   setConfigValue,
   getProviderTemplate,
+  MemoryFiles,
+  MemoryError,
+  SkillStore,
+  SkillError,
+  fetchGitHubSkills,
+  installBundle,
+  parseSkillSpec,
+  scanSkillFiles,
   type AgentRuntime,
   type ApprovalMode,
   type Lang,
+  type SkillMeta,
 } from '@sindar/core';
 import type {
   ApprovalAnswer,
   ClientMessage,
   HealthDTO,
+  MemoryFileDTO,
   ModelsDTO,
   PublicConfigDTO,
   ServerMessage,
+  SkillDTO,
 } from './protocol.js';
 import { TurnManager, toMessageDTO, toSessionDTO } from './runner.js';
 import { loadOrCreateToken } from './token.js';
@@ -62,6 +73,8 @@ const CONFIG_KEYS = new Set([
   'model.default',
   'model.fallbacks',
   'agent.approvalMode',
+  'skills.autoCreate',
+  'memory.nudgeEvery',
 ]);
 
 const MIME: Record<string, string> = {
@@ -92,6 +105,8 @@ function publicConfig(rt: AgentRuntime): PublicConfigDTO {
     theme: rt.config.ui.theme,
     model: { default: rt.config.model.default, fallbacks: [...rt.config.model.fallbacks] },
     approvalMode: rt.config.agent.approvalMode,
+    skillsMode: rt.config.skills.autoCreate,
+    memoryNudgeEvery: rt.config.memory.nudgeEvery,
     workspace: rt.paths.workspace,
     home: rt.paths.home,
     platform: {
@@ -202,6 +217,12 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
           rt.config.agent.approvalMode = value as ApprovalMode;
           manager.setApprovalMode(value as ApprovalMode);
           break;
+        case 'skills.autoCreate':
+          rt.config.skills.autoCreate = value as PublicConfigDTO['skillsMode'];
+          break;
+        case 'memory.nudgeEvery':
+          rt.config.memory.nudgeEvery = Number(value);
+          break;
         default:
           break;
       }
@@ -309,6 +330,181 @@ export async function createGateway(rt: AgentRuntime, opts: GatewayOptions = {})
       return c.json({ error: 'answer must be allow | always | deny' }, 400);
     const ok = manager.answer(c.req.param('id'), answer);
     return ok ? c.json({ ok: true }) : c.json({ error: 'no such pending approval' }, 404);
+  });
+
+  // ---- memory (M3) ------------------------------------------------------
+  const memoryFiles = () =>
+    rt.memory ??
+    new MemoryFiles(rt.paths, {
+      memory: rt.config.memory.maxChars,
+      user: rt.config.memory.userMaxChars,
+    });
+  const memoryDTO = (target: MemoryFileDTO['target']): MemoryFileDTO => {
+    if (target === 'soul') {
+      let content = '';
+      try {
+        content = fs.readFileSync(rt.paths.soul, 'utf8');
+      } catch {
+        /* missing */
+      }
+      return { target, content, chars: content.length, limit: 0, entries: 0, path: rt.paths.soul };
+    }
+    const mem = memoryFiles();
+    const st = mem.stats(target);
+    return {
+      target,
+      content: mem.read(target),
+      chars: st.chars,
+      limit: st.limit,
+      entries: st.entries,
+      path: mem.file(target),
+    };
+  };
+  app.get('/api/memory', (c) =>
+    c.json({ files: [memoryDTO('user'), memoryDTO('memory'), memoryDTO('soul')] }),
+  );
+  app.put('/api/memory/:target', async (c) => {
+    const target = c.req.param('target') as MemoryFileDTO['target'];
+    if (target !== 'memory' && target !== 'user' && target !== 'soul')
+      return c.json({ error: 'target must be memory | user | soul' }, 400);
+    const body = (await c.req.json().catch(() => ({}))) as { content?: unknown };
+    if (typeof body.content !== 'string') return c.json({ error: 'content required' }, 400);
+    try {
+      if (target === 'soul') {
+        if (body.content.length > 20_000)
+          return c.json({ error: 'SOUL.md is limited to 20000 chars' }, 400);
+        fs.writeFileSync(rt.paths.soul, body.content, { encoding: 'utf8', mode: 0o600 });
+      } else {
+        memoryFiles().write(target, body.content);
+      }
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, err instanceof MemoryError ? 400 : 500);
+    }
+    return c.json({ ok: true, file: memoryDTO(target) });
+  });
+
+  // ---- session search (M3) -----------------------------------------------
+  app.get('/api/search', (c) => {
+    const q = (c.req.query('q') ?? '').trim();
+    if (!q) return c.json({ query: q, results: [] });
+    const limit = Math.min(20, Math.max(1, Number(c.req.query('limit') ?? 10) || 10));
+    const results = rt.store.search(q, { limit }).map((r) => ({
+      session: toSessionDTO(r.session),
+      hits: r.hits,
+    }));
+    return c.json({ query: q, results });
+  });
+
+  // ---- skills (M3) --------------------------------------------------------
+  const skillStore = () =>
+    rt.skills ?? new SkillStore({ user: rt.paths.skills, extra: rt.config.skills.extraDirs });
+  const skillDTO = (s: SkillMeta): SkillDTO => ({
+    name: s.name,
+    description: s.description,
+    version: s.version,
+    tags: s.tags,
+    source: s.source,
+    chars: s.chars,
+    updatedAt: s.updatedAt,
+    origin: s.origin,
+  });
+  const skillError = (c: Context, err: unknown) => {
+    const e = err as Error & { code?: string };
+    const status = err instanceof SkillError ? (e.code === 'not-found' ? 404 : 400) : 500;
+    return c.json({ error: e.message, code: e.code }, status);
+  };
+  app.get('/api/skills', (c) =>
+    c.json({
+      skills: skillStore().list().map(skillDTO),
+      mode: rt.config.skills.autoCreate,
+      dir: rt.paths.skills,
+    }),
+  );
+  app.get('/api/skills/:name', (c) => {
+    const s = skillStore().get(c.req.param('name'));
+    if (!s) return c.json({ error: 'not found' }, 404);
+    return c.json({
+      skill: { ...skillDTO(s), body: s.body, raw: s.raw, files: s.files, path: s.file },
+    });
+  });
+  app.post('/api/skills', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      name?: string;
+      description?: string;
+      body?: string;
+      tags?: string[];
+    };
+    if (!body.name || !body.description || !body.body)
+      return c.json({ error: 'name, description and body are required' }, 400);
+    try {
+      const s = skillStore().create({
+        name: body.name,
+        description: body.description,
+        body: body.body,
+        tags: body.tags,
+      });
+      return c.json({ skill: { ...skillDTO(s), body: s.body, files: s.files, path: s.file } }, 201);
+    } catch (err) {
+      return skillError(c, err);
+    }
+  });
+  app.put('/api/skills/:name', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      description?: string;
+      body?: string;
+      tags?: string[];
+      changelog?: string;
+    };
+    try {
+      const s = skillStore().update(c.req.param('name'), body);
+      return c.json({ skill: { ...skillDTO(s), body: s.body, files: s.files, path: s.file } });
+    } catch (err) {
+      return skillError(c, err);
+    }
+  });
+  app.delete('/api/skills/:name', (c) => {
+    try {
+      skillStore().remove(c.req.param('name'));
+      return c.json({ ok: true });
+    } catch (err) {
+      return skillError(c, err);
+    }
+  });
+  app.post('/api/skills/install', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      source?: string;
+      force?: boolean;
+      overwrite?: boolean;
+      dryRun?: boolean;
+    };
+    if (!body.source?.trim())
+      return c.json({ error: 'source required (github:owner/repo/path)' }, 400);
+    try {
+      const spec = parseSkillSpec(body.source);
+      const bundles = await fetchGitHubSkills(spec, {
+        token: rt.env.GITHUB_TOKEN,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (body.dryRun) {
+        return c.json({
+          preview: bundles.map((b) => ({
+            name: b.name,
+            origin: b.origin,
+            files: b.files.map((f) => f.path),
+            warnings: scanSkillFiles(b.files),
+          })),
+        });
+      }
+      const store = skillStore();
+      const installed: Array<{ skill: SkillDTO; warnings: unknown[] }> = [];
+      for (const b of bundles) {
+        const r = installBundle(store, b, { force: body.force, overwrite: body.overwrite });
+        installed.push({ skill: skillDTO(r.skill), warnings: r.warnings });
+      }
+      return c.json({ installed }, 201);
+    } catch (err) {
+      return skillError(c, err);
+    }
   });
 
   // ---- status -----------------------------------------------------------

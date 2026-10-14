@@ -244,4 +244,91 @@ describe('gateway (mock provider)', () => {
       body: JSON.stringify({ 'ui.language': 'ar', 'agent.approvalMode': 'ask' }),
     });
   });
+
+  it('exposes memory files, session search and skills over REST (M3)', async () => {
+    // memory
+    const mem = await json(api('/api/memory'));
+    expect(mem.files.map((f: { target: string }) => f.target)).toEqual(['user', 'memory', 'soul']);
+    const user = mem.files[0];
+    const put = await api('/api/memory/user', {
+      method: 'PUT',
+      body: JSON.stringify({ content: `${user.content}- يفضّل الردود المختصرة\n` }),
+    });
+    expect(put.status).toBe(200);
+    expect((await json(put)).file.entries).toBe(user.entries + 1);
+    expect(fs.readFileSync(rt.paths.user, 'utf8')).toContain('يفضّل الردود المختصرة');
+    const tooBig = await api('/api/memory/memory', {
+      method: 'PUT',
+      body: JSON.stringify({ content: 'x'.repeat(rt.config.memory.maxChars + 1) }),
+    });
+    expect(tooBig.status).toBe(400);
+    expect((await api('/api/memory/nope', { method: 'PUT', body: '{"content":""}' })).status).toBe(
+      400,
+    );
+    // the config exposes the learning-loop knobs
+    const cfg = await json(api('/api/config'));
+    expect(cfg.skillsMode).toBe('ask');
+    expect(cfg.memoryNudgeEvery).toBe(8);
+    const modeRes = await api('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify({ 'skills.autoCreate': 'auto' }),
+    });
+    expect((await json(modeRes)).config.skillsMode).toBe('auto');
+    expect(rt.config.skills.autoCreate).toBe('auto');
+    await api('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify({ 'skills.autoCreate': 'ask' }),
+    });
+
+    // search
+    const s = rt.store.create({ channel: 'web', title: 'تقرير' });
+    rt.store.append(s.id, { role: 'user', content: 'اكتب تقرير المبيعات لشهر سبتمبر' });
+    rt.store.append(s.id, { role: 'assistant', content: 'done: reports/sales.md' });
+    const found = await json(api(`/api/search?q=${encodeURIComponent('تقرير المبيعات')}`));
+    expect(found.results).toHaveLength(1);
+    expect(found.results[0].session.id).toBe(s.id);
+    expect(found.results[0].hits[0].snippet).toContain('المبيعات');
+    expect((await json(api('/api/search?q='))).results).toEqual([]);
+
+    // skills
+    const list = await json(api('/api/skills'));
+    expect(list.mode).toBe('ask');
+    expect(list.skills.some((k: { name: string }) => k.name === 'git-workflow')).toBe(true);
+    const created = await api('/api/skills', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'weekly-report',
+        description: 'Weekly report',
+        body: '## Steps\n1. go',
+      }),
+    });
+    expect(created.status).toBe(201);
+    const one = await json(api('/api/skills/weekly-report'));
+    expect(one.skill.body).toContain('1. go');
+    expect(one.skill.source).toBe('user');
+    const upd = await json(
+      api('/api/skills/weekly-report', {
+        method: 'PUT',
+        body: JSON.stringify({ changelog: 'tweak', body: '## Steps\n1. go faster' }),
+      }),
+    );
+    expect(upd.skill.version).toBe('1.0.1');
+    expect(
+      (
+        await api('/api/skills', {
+          method: 'POST',
+          body: JSON.stringify({ name: 'bad name', description: 'd', body: 'b' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect((await api('/api/skills/weekly-report', { method: 'DELETE' })).status).toBe(200);
+    expect((await api('/api/skills/weekly-report')).status).toBe(404);
+    expect((await api('/api/skills/nope', { method: 'DELETE' })).status).toBe(404);
+    const install = await api('/api/skills/install', {
+      method: 'POST',
+      body: JSON.stringify({ source: 'nonsense' }),
+    });
+    expect(install.status).toBe(400);
+    expect((await json(install)).error).toMatch(/expected github:/);
+  });
 });

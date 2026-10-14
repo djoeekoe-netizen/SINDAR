@@ -288,7 +288,9 @@ describe('context builder', () => {
     const rt = await makeRuntime();
     try {
       const created = ensureIdentityFiles(rt.paths);
-      expect(created).toHaveLength(3);
+      // 3 identity files + the bundled skills
+      expect(created.filter((f) => f.endsWith('.md'))).toHaveLength(3);
+      expect(created.length).toBeGreaterThan(3);
       expect(ensureIdentityFiles(rt.paths)).toHaveLength(0);
       const proj = path.join(rt.paths.workspace, 'proj/sub');
       fs.mkdirSync(proj, { recursive: true });

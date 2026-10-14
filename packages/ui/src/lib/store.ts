@@ -87,6 +87,8 @@ export const pending = signal<ApprovalDTO[]>([]);
 export const models = signal<ModelsDTO | undefined>(undefined);
 export const sidebarOpen = signal(false);
 export const settingsOpen = signal(false);
+export const memoryOpen = signal(false);
+export const skillsOpen = signal(false);
 export const modelPickerOpen = signal(false);
 export const toast = signal<string | undefined>(undefined);
 export const version = signal<{ version: string; build: string } | undefined>(undefined);
@@ -303,6 +305,16 @@ function applyEvent(ev: EventDTO): void {
     case 'notice':
       notice('info', ev.message);
       break;
+    case 'skill_saved': {
+      const text = t(
+        lang.value,
+        ev.action === 'created' ? 'skills.saved.notice' : 'skills.updated.notice',
+        { name: ev.name },
+      );
+      notice('info', text);
+      showToast(text, 3500);
+      break;
+    }
     case 'error':
       finishAssistant();
       notice('error', friendlyError(ev.message, ev.code));

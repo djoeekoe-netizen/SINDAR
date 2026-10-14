@@ -144,6 +144,8 @@ export function serializeEvent(ev: AgentEvent): EventDTO | undefined {
       return { type: 'compress', beforeTokens: ev.beforeTokens, afterTokens: ev.afterTokens };
     case 'notice':
       return { type: 'notice', message: ev.message };
+    case 'skill_saved':
+      return { type: 'skill_saved', name: ev.name, action: ev.action };
     case 'retry_wait':
       return {
         type: 'retry_wait',

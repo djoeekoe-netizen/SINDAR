@@ -4,6 +4,9 @@ import type { Logger } from '../logger.js';
 import type { SindarPaths } from '../paths.js';
 import type { PlatformInfo } from '../platform.js';
 import type { ToolCall, ToolDefinition } from '../providers/types.js';
+import type { MemoryFiles } from '../memory/index.js';
+import type { SkillStore } from '../skills/index.js';
+import type { SessionStore } from '../agent/sessions.js';
 
 export type Risk = 'read' | 'write' | 'exec' | 'network';
 
@@ -30,6 +33,16 @@ export interface ToolContext {
   saveOverflow(name: string, text: string): string;
   /** Live progress line for UIs (optional). */
   onProgress?(line: string): void;
+  /** Runtime services for the learning-loop tools (memory, skills, session search). */
+  services?: ToolServices;
+}
+
+export interface ToolServices {
+  memory?: MemoryFiles;
+  skills?: SkillStore;
+  sessions?: Pick<SessionStore, 'search' | 'transcript' | 'find'>;
+  /** config `skills.autoCreate` — decides whether skill_manager needs approval. */
+  skillsMode?: 'ask' | 'auto' | 'off';
 }
 
 export interface Tool<TArgs = unknown> {

@@ -92,6 +92,75 @@ export function contentToText(c: Content | null | undefined): string {
   return c.map((p) => (p.type === 'text' ? p.text : '[image]')).join('\n');
 }
 
+export interface SessionSearchOptions {
+  /** Max sessions returned (default 5). */
+  limit?: number;
+  /** Max snippets per session (default 3). */
+  perSession?: number;
+  roles?: string[];
+  channel?: string;
+  /** Usually the current session — its messages are already in context. */
+  excludeSession?: string;
+}
+
+export interface SessionSearchHit {
+  seq: number;
+  role: string;
+  createdAt: number;
+  /** Matching excerpt; matched words wrapped in [brackets]. */
+  snippet: string;
+}
+
+export interface SessionSearchResult {
+  session: SessionSummaryRow;
+  hits: SessionSearchHit[];
+  /** Lower is better (bm25); 0 when the engine has no ranking. */
+  score: number;
+}
+
+interface HitRow {
+  seq: number;
+  session_id: string;
+  role: string;
+  created_at: number;
+  snippet: string | null;
+  rank: number;
+}
+
+/** Build a safe FTS MATCH expression: quoted words ANDed, longer words as prefixes. */
+export function ftsQuery(q: string): string {
+  const words = q
+    .replace(/["'`*()^:]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8);
+  if (!words.length) return '';
+  return words.map((w) => (w.length >= 3 ? `"${w}"*` : `"${w}"`)).join(' ');
+}
+
+function likeEscape(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/** Short excerpt around the first matching word, with matches bracketed. */
+function excerpt(text: string, words: string[], radius = 90): string {
+  const flat = text.replace(/\s+/g, ' ');
+  const lower = flat.toLowerCase();
+  let at = -1;
+  for (const w of words) {
+    at = lower.indexOf(w.toLowerCase());
+    if (at >= 0) break;
+  }
+  const start = Math.max(0, at - radius);
+  const end = Math.min(flat.length, (at < 0 ? 0 : at) + radius * 2);
+  let out = flat.slice(start, end);
+  for (const w of words) {
+    const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    out = out.replace(re, (m) => `[${m}]`);
+  }
+  return `${start > 0 ? '…' : ''}${out}${end < flat.length ? '…' : ''}`;
+}
+
 export function newId(): string {
   return randomUUID().replace(/-/g, '').slice(0, 20);
 }
@@ -247,6 +316,119 @@ export class SessionStore {
       name: r.name ?? undefined,
       createdAt: r.created_at,
     }));
+  }
+
+  /**
+   * Full-text search across past conversations (FTS5 → FTS4 → LIKE fallback).
+   * Hits are grouped per session, best session first, max `perSession` snippets each.
+   */
+  search(query: string, opts: SessionSearchOptions = {}): SessionSearchResult[] {
+    const q = query.trim();
+    if (!q) return [];
+    const limit = opts.limit ?? 5;
+    const perSession = opts.perSession ?? 3;
+    const roles = opts.roles ?? ['user', 'assistant'];
+    const fts = this.db.fts();
+    const roleSql = roles.map(() => '?').join(', ');
+    let rows: HitRow[] = [];
+    const match = ftsQuery(q);
+    if (fts !== 'none' && match) {
+      try {
+        rows =
+          fts === 'fts5'
+            ? this.db.all<HitRow>(
+                `SELECT m.seq, m.session_id, m.role, m.created_at,
+                        snippet(messages_fts, 0, '[', ']', '…', 14) AS snippet,
+                        bm25(messages_fts) AS rank
+                   FROM messages_fts JOIN messages m ON m.seq = messages_fts.rowid
+                  WHERE messages_fts MATCH ? AND m.role IN (${roleSql})
+                  ORDER BY rank LIMIT ?`,
+                [match, ...roles, limit * perSession * 4],
+              )
+            : this.db.all<HitRow>(
+                `SELECT m.seq, m.session_id, m.role, m.created_at,
+                        snippet(messages_fts, '[', ']', '…', -1, 14) AS snippet,
+                        0 AS rank
+                   FROM messages_fts JOIN messages m ON m.seq = messages_fts.docid
+                  WHERE messages_fts MATCH ? AND m.role IN (${roleSql})
+                  ORDER BY m.created_at DESC LIMIT ?`,
+                [match, ...roles, limit * perSession * 4],
+              );
+      } catch {
+        rows = [];
+      }
+    }
+    if (!rows.length) {
+      // LIKE fallback: every word must appear (case-insensitive for ASCII).
+      const words = q.split(/\s+/).filter(Boolean).slice(0, 8);
+      const where = words.map(() => "m.content LIKE ? ESCAPE '\\'").join(' AND ');
+      rows = this.db
+        .all<HitRow>(
+          `SELECT m.seq, m.session_id, m.role, m.created_at, m.content AS snippet, 0 AS rank
+             FROM messages m WHERE ${where} AND m.role IN (${roleSql})
+            ORDER BY m.created_at DESC LIMIT ?`,
+          [...words.map((w) => `%${likeEscape(w)}%`), ...roles, limit * perSession * 4],
+        )
+        .map((r) => ({ ...r, snippet: excerpt(r.snippet ?? '', words) }));
+    }
+    const groups = new Map<string, SessionSearchResult>();
+    for (const r of rows) {
+      if (opts.excludeSession && r.session_id === opts.excludeSession) continue;
+      let g = groups.get(r.session_id);
+      if (!g) {
+        const session = this.summary(r.session_id);
+        if (!session) continue;
+        if (opts.channel && session.channel !== opts.channel) continue;
+        g = { session, hits: [], score: r.rank };
+        groups.set(r.session_id, g);
+      }
+      if (g.hits.length >= perSession) continue;
+      g.hits.push({
+        seq: r.seq,
+        role: r.role,
+        createdAt: r.created_at,
+        snippet: (r.snippet ?? '').replace(/\s+/g, ' ').trim().slice(0, 300),
+      });
+    }
+    return Array.from(groups.values())
+      .toSorted((a, b) => a.score - b.score || b.session.updatedAt - a.session.updatedAt)
+      .slice(0, limit);
+  }
+
+  /** Plain-text transcript of a session (user/assistant text + tool call names), capped. */
+  transcript(sessionId: string, opts: { maxChars?: number; includeTools?: boolean } = {}): string {
+    const maxChars = opts.maxChars ?? 8000;
+    const lines: string[] = [];
+    for (const m of this.messages(sessionId)) {
+      if (m.role === 'system') continue;
+      if (m.role === 'tool') {
+        if (opts.includeTools)
+          lines.push(`tool(${m.name ?? '?'}): ${contentToText(m.content).slice(0, 300)}`);
+        continue;
+      }
+      const text = contentToText(m.content).trim();
+      const calls = m.toolCalls?.length
+        ? ` [tools: ${m.toolCalls.map((c) => c.name).join(', ')}]`
+        : '';
+      if (!text && !calls) continue;
+      lines.push(`${m.role}: ${text}${calls}`);
+    }
+    const full = lines.join('\n');
+    if (full.length <= maxChars) return full;
+    const head = full.slice(0, Math.floor(maxChars * 0.6));
+    const tail = full.slice(-Math.floor(maxChars * 0.4));
+    return `${head}\n…(${full.length - maxChars} chars omitted)…\n${tail}`;
+  }
+
+  /** User turns since the last call of `toolName` in this session (for memory/skill nudges). */
+  turnsSinceTool(sessionId: string, toolName: string): number {
+    return (
+      this.db.get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM messages WHERE session_id = ? AND role = 'user' AND seq >
+           (SELECT COALESCE(MAX(seq), 0) FROM messages WHERE session_id = ? AND role = 'tool' AND name = ?)`,
+        [sessionId, sessionId, toolName],
+      )?.n ?? 0
+    );
   }
 
   count(sessionId: string): number {

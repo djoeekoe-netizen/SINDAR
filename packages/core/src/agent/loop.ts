@@ -17,6 +17,9 @@ import {
 import type { Tool, ToolContext, ToolRegistry, ToolResult } from '../tools/types.js';
 import { buildSystemPrompt, estimateTokens } from './context.js';
 import { contentToText, type Session, type SessionStore, type StoredMessage } from './sessions.js';
+import { MemoryFiles } from '../memory/index.js';
+import { SkillStore } from '../skills/index.js';
+import { learningSections, reflectSkill } from './learning.js';
 
 export type ApprovalAnswer = 'allow' | 'deny' | 'always';
 
@@ -39,6 +42,7 @@ export type AgentEvent =
   | { type: 'model_switch'; from: string; to: string; reason: string }
   | { type: 'compress'; beforeTokens: number; afterTokens: number }
   | { type: 'notice'; message: string }
+  | { type: 'skill_saved'; name: string; action: 'created' | 'updated' }
   | { type: 'retry_wait'; model: string; seconds: number; attempt: number; reason: string }
   | { type: 'done'; finishReason: FinishReason; text: string; iterations: number }
   | { type: 'error'; error: Error };
@@ -53,6 +57,9 @@ export interface AgentRuntime {
   registry: ProviderRegistry;
   tools: ToolRegistry;
   store: SessionStore;
+  /** Learning loop services (created from paths/config when omitted). */
+  memory?: MemoryFiles;
+  skills?: SkillStore;
 }
 
 export interface TurnOptions {
@@ -165,6 +172,18 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       return file;
     },
   };
+  const memoryFiles =
+    rt.memory ??
+    new MemoryFiles(rt.paths, { memory: config.memory.maxChars, user: config.memory.userMaxChars });
+  const skillStore =
+    rt.skills ?? new SkillStore({ user: rt.paths.skills, extra: config.skills.extraDirs });
+  toolCtx.services = {
+    memory: memoryFiles,
+    skills: skillStore,
+    sessions: store,
+    skillsMode: config.skills.autoCreate,
+  };
+  const toolNames = new Set(tools.list().map((t) => t.name));
 
   const candidates = registry.candidates(opts.modelRef ?? session.model ?? undefined);
   let targetIdx = 0;
@@ -193,6 +212,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
   let finishReason: FinishReason = 'stop';
   let iterations = 0;
   let toolCallCount = 0;
+  let skillTouched = false;
   const maxIterations = config.agent.maxIterations;
   const toolDefs = tools.definitions();
 
@@ -206,7 +226,16 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       workspace,
       tools: tools.list(),
       approvalMode: opts.policy.mode,
-      extraSections: opts.extraSections,
+      extraSections: [
+        ...learningSections({
+          config,
+          memory: memoryFiles,
+          skills: skillStore,
+          toolNames,
+          turnsSinceMemorySave: store.turnsSinceTool(session.id, 'memory'),
+        }),
+        ...(opts.extraSections ?? []),
+      ],
     });
 
   const assemble = (): ChatMessage[] => {
@@ -520,9 +549,22 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       const ms = Date.now() - started;
       emit({ type: 'tool_end', call, result, ms });
       rt.logger.info('tool', { name: tool.name, ms, error: result.isError ?? false });
+      if (tool.name === 'skill_manager' && !result.isError) skillTouched = true;
+      let content = result.content;
+      if (
+        toolCallCount === config.skills.reflectAfterToolCalls &&
+        config.skills.autoCreate !== 'off' &&
+        toolNames.has('skill_manager')
+      ) {
+        content += `\n\n[SINDAR note: this task has already taken ${toolCallCount} tool calls. ${
+          config.skills.autoCreate === 'auto'
+            ? 'If the procedure is likely to recur, save it as a skill with skill_manager once the task is done (steps, commands, pitfalls).'
+            : 'If the procedure is likely to recur, end your final answer with a one-line offer to save it as a skill — do not create it before the user agrees.'
+        }]`;
+      }
       store.append(session.id, {
         role: 'tool',
-        content: result.content,
+        content,
         toolCallId: call.id,
         name: call.name,
       });
@@ -539,6 +581,37 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     store.append(session.id, { role: 'assistant', content: note });
     finalText = note;
     finishReason = 'length';
+  }
+
+  // 3) Learning loop: in `auto` mode, distil a reusable skill out of complex successful tasks.
+  if (
+    config.skills.autoCreate === 'auto' &&
+    finishReason === 'stop' &&
+    !skillTouched &&
+    toolCallCount >= config.skills.reflectAfterToolCalls &&
+    toolNames.has('skill_manager') &&
+    !signal?.aborted
+  ) {
+    try {
+      const saved = await reflectSkill({
+        provider: target.provider,
+        model: target.model,
+        skills: skillStore,
+        transcript: store.transcript(session.id, { maxChars: 6000, includeTools: false }),
+        signal,
+        onUsage: (usage) => {
+          totalUsage.inputTokens += usage.inputTokens;
+          totalUsage.outputTokens += usage.outputTokens;
+          store.recordUsage(session.id, target.providerId, target.model, usage);
+        },
+      });
+      if (saved) {
+        emit({ type: 'skill_saved', name: saved.name, action: saved.action });
+        rt.logger.info('skill saved by reflection', saved);
+      }
+    } catch (err) {
+      rt.logger.warn('skill reflection failed', { error: (err as Error).message });
+    }
   }
 
   emit({ type: 'done', finishReason, text: finalText, iterations });

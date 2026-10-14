@@ -85,6 +85,7 @@ export type EventDTO =
   | { type: 'model_switch'; from: string; to: string; reason: string }
   | { type: 'compress'; beforeTokens: number; afterTokens: number }
   | { type: 'notice'; message: string }
+  | { type: 'skill_saved'; name: string; action: 'created' | 'updated' }
   | { type: 'retry_wait'; model: string; seconds: number; attempt: number; reason: string }
   | { type: 'done'; finishReason: string; text: string; iterations: number }
   | { type: 'error'; message: string; code?: string };
@@ -94,6 +95,8 @@ export interface PublicConfigDTO {
   theme: 'dark' | 'light' | 'system';
   model: { default: string; fallbacks: string[] };
   approvalMode: 'ask' | 'allowlist' | 'yolo';
+  skillsMode: 'ask' | 'auto' | 'off';
+  memoryNudgeEvery: number;
   workspace: string;
   home: string;
   platform: { os: string; isTermux: boolean; arch: string; nodeVersion: string };
@@ -186,3 +189,51 @@ export type ServerMessage =
   | { type: 'config'; config: PublicConfigDTO }
   | { type: 'pong' }
   | { type: 'error'; message: string; ref?: string };
+
+/* ---- learning loop (M3) ---- */
+
+export interface MemoryFileDTO {
+  target: 'memory' | 'user' | 'soul';
+  content: string;
+  chars: number;
+  /** 0 = unlimited (SOUL.md). */
+  limit: number;
+  entries: number;
+  path: string;
+}
+
+export interface SkillDTO {
+  name: string;
+  description: string;
+  version: string;
+  tags: string[];
+  source: 'bundled' | 'user' | 'installed' | 'extra';
+  chars: number;
+  updatedAt: number;
+  origin?: string;
+  /** Only present on GET /api/skills/:name. */
+  body?: string;
+  raw?: string;
+  files?: string[];
+  path?: string;
+}
+
+export interface SearchHitDTO {
+  seq: number;
+  role: string;
+  createdAt: number;
+  snippet: string;
+}
+
+export interface SearchResultDTO {
+  session: SessionDTO;
+  hits: SearchHitDTO[];
+}
+
+export interface ScanWarningDTO {
+  level: 'danger' | 'warn';
+  file: string;
+  line: number;
+  pattern: string;
+  text: string;
+}

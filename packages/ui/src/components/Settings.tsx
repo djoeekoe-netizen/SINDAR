@@ -89,6 +89,21 @@ export function Settings() {
             </div>
           </section>
           <section>
+            <h3>{t(l, 'settings.skills.mode')}</h3>
+            <div class="seg vertical">
+              {(['ask', 'auto', 'off'] as const).map((m) => (
+                <button
+                  key={m}
+                  class={cfg?.skillsMode === m ? 'on' : ''}
+                  onClick={() => void saveConfig({ 'skills.autoCreate': m })}
+                >
+                  {t(l, `settings.skills.mode.${m}` as const)}
+                </button>
+              ))}
+            </div>
+            <p class="muted small">{t(l, 'settings.skills.hint')}</p>
+          </section>
+          <section>
             <h3>{t(l, 'settings.model.default')}</h3>
             <input
               dir="ltr"
