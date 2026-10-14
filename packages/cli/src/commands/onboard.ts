@@ -252,11 +252,25 @@ export async function onboard(
                   : 'Say hello in one short sentence.',
             },
           ],
-          maxTokens: 60,
+          // reasoning models (gpt-oss, qwen3) spend tokens thinking before answering
+          maxTokens: 600,
         }),
       );
       if (res.error) throw res.error;
-      out(t(lang, 'onboard.test.reply', { text: res.text.trim().split('\n')[0] ?? '' }));
+      const firstLine =
+        res.text
+          .trim()
+          .split('\n')
+          .find((l) => l.trim()) ?? '';
+      out(
+        t(lang, 'onboard.test.reply', {
+          text:
+            firstLine ||
+            (lang === 'ar'
+              ? '(ردّ فارغ — جرّب نموذجاً آخر إن تكرر)'
+              : '(empty reply — try another model if it repeats)'),
+        }),
+      );
     } catch (err) {
       out(pc.yellow(t(lang, 'onboard.key.fail', { error: (err as Error).message })));
     }

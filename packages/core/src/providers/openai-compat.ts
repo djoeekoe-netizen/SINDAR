@@ -35,7 +35,7 @@ const DEFAULT_UA = 'sindar';
 
 /** Models that are not chat models and should be hidden from pickers. */
 const NON_CHAT =
-  /(whisper|tts|embed|embedding|guard|moderation|rerank|audio|transcri|dall-e|image|vision-preview$|aqa|imagen|veo|-live-|native-audio)/i;
+  /(whisper|tts|embed|embedding|guard|moderation|rerank|audio|transcri|dall-e|image|vision-preview$|aqa|imagen|veo|-live-|native-audio|orpheus|canopylabs|playai|safeguard)/i;
 
 export function isChatModelId(id: string): boolean {
   return !NON_CHAT.test(id);
