@@ -173,18 +173,18 @@ describe.skipIf(!hasBuild)('built binary', () => {
   });
 });
 
+const freePort = () =>
+  new Promise<number>((resolve) => {
+    const srv = net.createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address() as net.AddressInfo;
+      srv.close(() => resolve(port));
+    });
+  });
+
 describe.skipIf(!hasBuild || process.platform === 'win32')(
   'gateway stop finds orphan brains',
   () => {
-    const freePort = () =>
-      new Promise<number>((resolve) => {
-        const srv = net.createServer();
-        srv.listen(0, '127.0.0.1', () => {
-          const { port } = srv.address() as net.AddressInfo;
-          srv.close(() => resolve(port));
-        });
-      });
-
     it('stops an old `gateway run` that has no pid file and no shutdown endpoint', async () => {
       const home = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-cli-orphan-'));
       const port = await freePort();
@@ -269,6 +269,82 @@ describe.skipIf(!hasBuild)('chat / onboard / config (mock provider)', () => {
     const model = run(['--lang', 'en', 'model'], env);
     expect(model.stdout).toContain('Default model: groq:llama-3.3-70b-versatile');
     expect(model.stdout).toMatch(/groq\s+ready/);
+  });
+
+  it('onboard replaces a retired --model with one the provider still lists (Gemini 404 case)', async () => {
+    const home2 = fs.mkdtempSync(path.join(os.tmpdir(), 'sindar-cli-retired-'));
+    const port = await freePort();
+    // A stand-in for Google's endpoint in Oct 2026: /models lists 3.8, 2.5 answers 404 "no longer
+    // available". Runs as its own process because `run()` blocks this one with spawnSync.
+    const fake = path.join(home2, 'fake-gemini.cjs');
+    fs.writeFileSync(
+      fake,
+      `const http = require('node:http');
+const sse = (res, text) => {
+  res.setHeader('content-type', 'text/event-stream');
+  res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: text } }] }) + '\\n\\n');
+  res.write('data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] }) + '\\n\\n');
+  res.end('data: [DONE]\\n\\n');
+};
+const srv = http.createServer((req, res) => {
+  if (req.url.endsWith('/models')) {
+    res.setHeader('content-type', 'application/json');
+    return res.end(JSON.stringify({ data: [
+      { id: 'models/gemini-3.8-flash-lite' }, { id: 'models/gemini-3.8-flash' }, { id: 'models/gemini-embedding-001' },
+    ] }));
+  }
+  let body = '';
+  req.on('data', (c) => (body += c));
+  req.on('end', () => {
+    const model = JSON.parse(body).model;
+    if (model !== 'gemini-3.8-flash') {
+      res.statusCode = 404;
+      return res.end(JSON.stringify({ error: { message: 'This model models/' + model + ' is no longer available to new users. Please update your code to use models/gemini-3.8-flash' } }));
+    }
+    sse(res, 'Hello from 3.8!');
+  });
+});
+srv.listen(${port}, '127.0.0.1', () => console.log('up'));
+process.on('SIGTERM', () => srv.close(() => process.exit(0)));`,
+    );
+    let child: ChildProcess | undefined;
+    try {
+      child = spawn(process.execPath, [fake], { stdio: ['ignore', 'pipe', 'ignore'] });
+      await new Promise<void>((resolve) => child!.stdout!.once('data', () => resolve()));
+      const env2 = { SINDAR_HOME: home2, GEMINI_BASE_URL: `http://127.0.0.1:${port}` };
+      const r = run(
+        [
+          '--lang',
+          'en',
+          'onboard',
+          '--provider',
+          'gemini',
+          '--key',
+          'AIza_fake',
+          '--model',
+          'gemini-2.5-flash',
+          '--approval',
+          'ask',
+          '-y',
+        ],
+        env2,
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('gemini-2.5-flash is no longer available to your key');
+      expect(r.stdout).toContain('Hello from 3.8!');
+      const cfg = fs.readFileSync(path.join(home2, 'config.yaml'), 'utf8');
+      expect(cfg).toContain('default: gemini:gemini-3.8-flash');
+      expect(cfg).toContain('gemini:gemini-3.8-flash-lite');
+      expect(cfg).not.toContain('2.5');
+
+      // `sindar model <retired>` warns and names the closest live model
+      const m = run(['--lang', 'en', 'model', 'gemini:gemini-2.5-flash'], env2);
+      expect(m.stdout).toContain('does not list gemini:gemini-2.5-flash');
+      expect(m.stdout).toContain('Closest available: gemini:gemini-3.8-flash');
+    } finally {
+      child?.kill('SIGKILL');
+      fs.rmSync(home2, { recursive: true, force: true });
+    }
   });
 
   it('config set/get validate values', () => {

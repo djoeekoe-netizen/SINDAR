@@ -7,3 +7,4 @@ export * from './http.js';
 export * from './openai-compat.js';
 export * from './anthropic.js';
 export * from './registry.js';
+export * from './pick.js';

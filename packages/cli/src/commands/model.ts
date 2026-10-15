@@ -1,7 +1,51 @@
 import type { Command } from 'commander';
 import pc from 'picocolors';
-import { isChatModelId, resolveProviders, setConfigValue, t } from '@sindar/core';
-import { bootstrap } from '../app.js';
+import {
+  PROVIDER_TEMPLATES,
+  isChatModelId,
+  pickAvailableModel,
+  resolveProviders,
+  setConfigValue,
+  t,
+} from '@sindar/core';
+import { bootstrap, type App } from '../app.js';
+
+/** Best effort: tell the user when the provider does not list this model (retired / typo). */
+async function warnIfMissing(
+  app: App,
+  providerId: string,
+  ref: string,
+  out: (s?: string) => void,
+): Promise<void> {
+  try {
+    const provider = app.registry.get(providerId);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ids = (await Promise.race([
+      provider.listModels(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timeout')), 8000);
+      }),
+    ]).finally(() => clearTimeout(timer))) as Array<{ id: string }>;
+    const { model } = app.registry.parse(ref);
+    if (ids.length && !ids.some((m) => m.id === model)) {
+      const alt = pickAvailableModel(
+        ids.map((m) => m.id),
+        PROVIDER_TEMPLATES.find((tp) => tp.id === providerId)?.suggestedModels ?? [],
+      );
+      out(
+        pc.yellow(
+          t(app.lang, 'model.warn.missing', {
+            model: ref,
+            provider: providerId,
+            alt: alt ? `${providerId}:${alt}` : '-',
+          }),
+        ),
+      );
+    }
+  } catch {
+    /* offline or provider without a list endpoint */
+  }
+}
 
 export function registerModel(program: Command): void {
   program
@@ -39,6 +83,7 @@ export function registerModel(program: Command): void {
             setConfigValue(app.paths.config, 'model.default', ref);
             out(pc.green(t(app.lang, 'model.set', { model: ref })));
             if (!r.configured) out(pc.yellow(t(app.lang, 'model.warn.unconfigured', { provider })));
+            else await warnIfMissing(app, provider, ref, out);
             return;
           }
           if (opts.list) {

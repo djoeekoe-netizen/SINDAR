@@ -194,6 +194,7 @@ export const en: Record<keyof typeof ar, string> = {
   'onboard.local.unreachable': 'Local server not reachable at {url} — start it and retry',
   'onboard.model.title': 'Pick a model:',
   'onboard.model.prompt': 'Number or type a model name [{default}]: ',
+  'onboard.model.replaced': '{model} is no longer available to your key — using {alt} instead',
   'onboard.model.fetching': 'Fetching model list…',
   'onboard.fallbacks': 'Fallback models when busy: {models}',
   'chat.retry.wait': '⏳ {model} is busy — waiting {seconds}s then retrying ({attempt}/3)…',
@@ -215,6 +216,8 @@ export const en: Record<keyof typeof ar, string> = {
   'model.ready': 'ready',
   'model.nokey': 'no key ({env})',
   'model.set': 'Default model set to {model}',
+  'model.warn.missing':
+    'Note: {provider} does not list {model} (retired?). Closest available: {alt} — full list: sindar model --list {provider}',
   'model.warn.unconfigured': 'Warning: provider {provider} has no key yet — run sindar onboard',
   'model.listing': 'Models for {provider}:',
   'config.saved': 'Saved: {key} = {value}',

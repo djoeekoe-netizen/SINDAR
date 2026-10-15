@@ -90,7 +90,14 @@ export const PROVIDER_TEMPLATES: readonly ProviderTemplate[] = [
     requiresKey: true,
     free: 'free-tier',
     signupUrl: 'https://aistudio.google.com/apikey',
-    suggestedModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    // Google retires models for new users; onboarding checks this list against /models and
+    // falls back to the newest "flash" the key can use.
+    suggestedModels: [
+      'gemini-3.8-flash',
+      'gemini-3.8-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+    ],
     notes: {
       ar: 'طبقة مجانية بحدود يومية، نافذة سياق كبيرة',
       en: 'Free tier with daily limits, large context window',

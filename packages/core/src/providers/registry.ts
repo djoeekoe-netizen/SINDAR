@@ -38,7 +38,7 @@ export function instantiateProvider(
 
 /** Known context windows (tokens) for popular free models; used for compression thresholds. */
 const CONTEXT_WINDOWS: Array<[RegExp, number]> = [
-  [/gemini-2\.5|gemini-2\.0|gemini-1\.5/i, 1_000_000],
+  [/gemini-/i, 1_000_000],
   [/llama-3\.3-70b|llama-3\.1|llama-4/i, 128_000],
   [/qwen3|qwen-3|qwq/i, 128_000],
   [/gpt-4o|gpt-4\.1|gpt-5|o[134]-/i, 128_000],

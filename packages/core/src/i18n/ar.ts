@@ -190,6 +190,7 @@ export const ar = {
   'onboard.local.unreachable': 'الخادم المحلي غير متاح على {url} — شغّله ثم أعد المحاولة',
   'onboard.model.title': 'اختر النموذج:',
   'onboard.model.prompt': 'الرقم أو اكتب اسم نموذج [{default}]: ',
+  'onboard.model.replaced': 'النموذج {model} لم يعد متاحاً لمفتاحك — اخترت بدلاً منه {alt}',
   'onboard.model.fetching': 'جارٍ جلب قائمة النماذج…',
   'onboard.fallbacks': 'نماذج احتياطية عند الازدحام: {models}',
   'chat.retry.wait':
@@ -212,6 +213,8 @@ export const ar = {
   'model.ready': 'جاهز',
   'model.nokey': 'بلا مفتاح ({env})',
   'model.set': 'تم ضبط النموذج الافتراضي: {model}',
+  'model.warn.missing':
+    'تنبيه: المزود {provider} لا يعرض النموذج {model} (ربما أوقفه). المتاح الأقرب: {alt} — القائمة كاملة: sindar model --list {provider}',
   'model.warn.unconfigured': 'تنبيه: المزود {provider} ليس له مفتاح بعد — شغّل sindar onboard',
   'model.listing': 'نماذج {provider}:',
   'config.saved': 'تم الحفظ: {key} = {value}',

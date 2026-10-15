@@ -13,6 +13,8 @@ import {
   type Lang,
   type ProviderTemplate,
   type ResolvedProvider,
+  isModelUnavailableMessage,
+  pickAvailableModel,
 } from '@sindar/core';
 import { bootstrap, type App } from '../app.js';
 import { createPrompter, type Prompter } from '../ui/prompt.js';
@@ -184,19 +186,41 @@ export async function onboard(
   // 4) model
   let model = opts.model;
   let fallbackPool: string[] = [];
-  if (!model) {
-    const suggested = tpl.suggestedModels ?? [];
-    let remote: string[] = [];
-    if (!opts.test === false) {
-      out(pc.dim(t(lang, 'onboard.model.fetching')));
-      try {
-        remote = (await instantiateProvider(resolved).listModels())
-          .map((m) => m.id)
-          .filter(isChatModelId);
-      } catch {
-        remote = [];
+  const suggested = tpl.suggestedModels ?? [];
+  let remote: string[] = [];
+  const fetchRemote = async (): Promise<string[]> => {
+    if (remote.length) return remote;
+    out(pc.dim(t(lang, 'onboard.model.fetching')));
+    try {
+      remote = (await instantiateProvider(resolved).listModels())
+        .map((m) => m.id)
+        .filter(isChatModelId);
+    } catch {
+      remote = [];
+    }
+    return remote;
+  };
+  if (model && opts.test !== false) {
+    // An explicit --model may have been retired since the docs were written (Gemini does this).
+    const list = await fetchRemote();
+    if (list.length && !list.includes(model)) {
+      const alt = pickAvailableModel(list, suggested);
+      if (alt) {
+        out(pc.yellow(t(lang, 'onboard.model.replaced', { model, alt })));
+        model = alt;
       }
     }
+    fallbackPool = suggested.filter((s) => list.length === 0 || list.includes(s));
+    if (list.length && fallbackPool.length < 2) {
+      const extra = pickAvailableModel(
+        list.filter((m) => m !== model && !fallbackPool.includes(m)),
+        [],
+      );
+      if (extra) fallbackPool.push(extra);
+    }
+  }
+  if (!model) {
+    if (!opts.test === false) await fetchRemote();
     const choices = [
       ...new Set([
         ...suggested.filter((s) => remote.length === 0 || remote.includes(s)),
@@ -246,44 +270,63 @@ export async function onboard(
   if (approval && approval !== app.config.agent.approvalMode)
     setConfigValue(app.paths.config, 'agent.approvalMode', approval);
 
-  // 6) quick test
+  // 6) quick test (if the model turned out to be retired, pick a live one and test again)
   if (!opts.test === false) {
-    out(pc.dim(t(lang, 'onboard.test')));
-    try {
-      const provider = instantiateProvider(resolved);
-      const res = await collectChat(
-        provider.chat({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content:
-                lang === 'ar'
-                  ? 'قل مرحباً في جملة واحدة قصيرة.'
-                  : 'Say hello in one short sentence.',
-            },
-          ],
-          // reasoning models (gpt-oss, qwen3) spend tokens thinking before answering
-          maxTokens: 600,
-        }),
-      );
-      if (res.error) throw res.error;
-      const firstLine =
-        res.text
-          .trim()
-          .split('\n')
-          .find((l) => l.trim()) ?? '';
-      out(
-        t(lang, 'onboard.test.reply', {
-          text:
-            firstLine ||
-            (lang === 'ar'
-              ? '(ردّ فارغ — جرّب نموذجاً آخر إن تكرر)'
-              : '(empty reply — try another model if it repeats)'),
-        }),
-      );
-    } catch (err) {
-      out(pc.yellow(t(lang, 'onboard.key.fail', { error: (err as Error).message })));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      out(pc.dim(t(lang, 'onboard.test')));
+      try {
+        const provider = instantiateProvider(resolved);
+        const res = await collectChat(
+          provider.chat({
+            model,
+            messages: [
+              {
+                role: 'user',
+                content:
+                  lang === 'ar'
+                    ? 'قل مرحباً في جملة واحدة قصيرة.'
+                    : 'Say hello in one short sentence.',
+              },
+            ],
+            // reasoning models (gpt-oss, qwen3) spend tokens thinking before answering
+            maxTokens: 600,
+          }),
+        );
+        if (res.error) throw res.error;
+        const firstLine =
+          res.text
+            .trim()
+            .split('\n')
+            .find((l) => l.trim()) ?? '';
+        out(
+          t(lang, 'onboard.test.reply', {
+            text:
+              firstLine ||
+              (lang === 'ar'
+                ? '(ردّ فارغ — جرّب نموذجاً آخر إن تكرر)'
+                : '(empty reply — try another model if it repeats)'),
+          }),
+        );
+        break;
+      } catch (err) {
+        const msg = (err as Error).message;
+        out(pc.yellow(t(lang, 'onboard.key.fail', { error: msg })));
+        if (attempt > 0 || !isModelUnavailableMessage(msg)) break;
+        const list = await fetchRemote();
+        const alt = pickAvailableModel(
+          list.filter((m) => m !== model),
+          suggested.filter((m) => m !== model),
+        );
+        if (!alt) break;
+        out(pc.yellow(t(lang, 'onboard.model.replaced', { model, alt })));
+        model = alt;
+        setConfigValue(app.paths.config, 'model.default', `${tpl.id}:${model}`);
+        const fb = fallbackPool
+          .filter((m) => m !== model)
+          .slice(0, 2)
+          .map((m) => `${tpl.id}:${m}`);
+        setConfigValue(app.paths.config, 'model.fallbacks', fb);
+      }
     }
   }
   out();
