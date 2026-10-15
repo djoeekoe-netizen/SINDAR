@@ -36,7 +36,7 @@ describe.each(drivers)('driver %s', (driver) => {
   it('migrates to the latest schema idempotently', async () => {
     const file = path.join(dir, 'a.db');
     const { db, migration } = await openDatabase(file, { driver });
-    expect(migration?.applied).toEqual([1, 2]);
+    expect(migration?.applied).toEqual([1, 2, 3]);
     expect(migration?.current).toBe(LATEST_SCHEMA_VERSION);
     expect(schemaVersion(db)).toBe(LATEST_SCHEMA_VERSION);
     expect(migrate(db).applied).toEqual([]);

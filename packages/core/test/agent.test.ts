@@ -29,7 +29,8 @@ describe('agent loop (mock provider)', () => {
       const msgs = rt.store.messages(session.id);
       expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant']);
       expect(rt.store.get(session.id)?.title).toBe('hello there');
-      expect(rt.store.get(session.id)?.model).toBe('mock:echo');
+      // sessions follow the configured default unless the user pins a model for that chat
+      expect(rt.store.get(session.id)?.model).toBeNull();
       expect(rt.store.usage(session.id)[0]?.calls).toBe(1);
       const again = await runTurn(rt, { session, input: 'second', policy: policy() });
       expect(again.text).toBe('echo: second');

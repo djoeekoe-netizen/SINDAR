@@ -4,6 +4,7 @@ import { createMockProvider, type MockProviderOptions } from './mock.js';
 import { formatModelRef, parseModelRef, type ModelRef } from './model-ref.js';
 import { createOpenAICompatProvider, type HttpProviderOptions } from './openai-compat.js';
 import { resolveProvider, type ResolvedProvider } from './resolve.js';
+import { isModelUnavailableMessage, pickAvailableModel } from './pick.js';
 import { getProviderTemplate } from './templates.js';
 import { ProviderError, type Provider } from './types.js';
 
@@ -173,10 +174,88 @@ export class ProviderRegistry {
     };
   }
 
-  /** Default target followed by configured fallbacks (refs only; instantiation happens lazily). */
+  /**
+   * Models to try, in order: the session's explicit pick (if any), the configured default, then the
+   * fallbacks. Refs the provider has retired (see `replacementFor`) are swapped for their live
+   * replacement so a dead model costs one failed call per process, not one per message.
+   */
   candidates(primary?: string): string[] {
-    const list = [primary ?? this.config.model.default, ...this.config.model.fallbacks];
-    return [...new Set(list.filter(Boolean))];
+    const list = [primary, this.config.model.default, ...this.config.model.fallbacks]
+      .filter((r): r is string => Boolean(r))
+      .map((r) => this.liveRef(r));
+    return [...new Set(list)];
+  }
+
+  // --- retired models -------------------------------------------------------------------------
+  private readonly retired = new Set<string>();
+  private readonly replacements = new Map<string, string>();
+
+  /** The ref to use for `ref` once a retirement has been discovered (identity otherwise). */
+  liveRef(ref: string): string {
+    const seen = new Set<string>();
+    let cur = ref;
+    while (this.replacements.has(cur) && !seen.has(cur)) {
+      seen.add(cur);
+      cur = this.replacements.get(cur)!;
+    }
+    return cur;
+  }
+
+  isRetired(ref: string): boolean {
+    return this.retired.has(ref);
+  }
+
+  /** Does this error say the model id itself is gone (404 / "no longer available" / "does not exist")? */
+  static looksRetired(err: unknown): boolean {
+    if (!(err instanceof ProviderError)) return false;
+    if (err.code === 'network' || err.code === 'auth') return false;
+    return err.status === 404 || isModelUnavailableMessage(err.message);
+  }
+
+  /**
+   * Confirm with the provider's live model list that `ref` is gone and pick a replacement from the
+   * same provider (first suggested model still listed, else the newest full-size one). Returns
+   * undefined when the model is still listed (so the error meant something else), when the list
+   * cannot be fetched, or when nothing usable is left. Cached per process.
+   */
+  async replacementFor(ref: string): Promise<string | undefined> {
+    const known = this.replacements.get(ref);
+    if (known) return known;
+    const { provider: providerId, model } = this.parse(ref);
+    let ids: string[];
+    try {
+      const provider = this.get(providerId);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      ids = (
+        await Promise.race([
+          provider.listModels(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('model list timeout')), 8000);
+          }),
+        ]).finally(() => clearTimeout(timer))
+      ).map((m) => m.id);
+    } catch {
+      return undefined;
+    }
+    if (ids.length === 0 || ids.includes(model)) return undefined;
+    this.retired.add(ref);
+    const skip = new Set(
+      [...this.retired]
+        .map((r) => this.parse(r))
+        .filter((m) => m.provider === providerId)
+        .map((m) => m.model),
+    );
+    const suggested = (getProviderTemplate(providerId)?.suggestedModels ?? []).filter(
+      (m) => !skip.has(m),
+    );
+    const alt = pickAvailableModel(
+      ids.filter((id) => !skip.has(id)),
+      suggested,
+    );
+    if (!alt) return undefined;
+    const altRef = formatModelRef({ provider: providerId, model: alt });
+    this.replacements.set(ref, altRef);
+    return altRef;
   }
 
   contextWindow(model: string): number {

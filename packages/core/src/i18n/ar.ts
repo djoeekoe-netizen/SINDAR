@@ -212,7 +212,10 @@ export const ar = {
   'model.providers': 'المزودون:',
   'model.ready': 'جاهز',
   'model.nokey': 'بلا مفتاح ({env})',
+  'model.live': 'العقل العامل استلم التغيير — الرسالة التالية تستخدمه مباشرة',
+  'model.restartHint': 'العقل يعمل بإعداد قديم — شغّل: sindar gateway restart',
   'model.set': 'تم ضبط النموذج الافتراضي: {model}',
+  'model.warn.badRef': 'تنبيه: «{model}» ليس بصيغة provider:model (مثال: groq:openai/gpt-oss-120b)',
   'model.warn.missing':
     'تنبيه: المزود {provider} لا يعرض النموذج {model} (ربما أوقفه). المتاح الأقرب: {alt} — القائمة كاملة: sindar model --list {provider}',
   'model.warn.unconfigured': 'تنبيه: المزود {provider} ليس له مفتاح بعد — شغّل sindar onboard',
@@ -371,6 +374,8 @@ export const ar = {
   // ---- agent loop (request budget) ----
   'agent.trimmed': 'الطلب كان أكبر من حد النموذج (~{limit} توكن) — اختصرتُ السياق وأعدتُ المحاولة.',
   'agent.minuteBusy': 'حدّ الدقيقة للنموذج {model} ممتلئ',
+  'agent.modelRetired': 'ℹ️ المزود أوقف النموذج {model} — سأستخدم {alt} بدله (حفظته في الإعدادات).',
+  'agent.allFailed': 'جرّبت {n} نماذج ولم ينجح أي منها:',
   'agent.minuteWait':
     'النموذج المجاني {model} وصل حدّ التوكنات في الدقيقة — أنتظر حتى يتجدد ثم أكمل',
   'agent.tooLarge':

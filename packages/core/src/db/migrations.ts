@@ -159,7 +159,20 @@ const v2: Migration = {
   },
 };
 
-export const MIGRATIONS: Migration[] = [init, v2];
+/**
+ * Schema v3 — sessions used to be pinned to whatever model was the default on their first message,
+ * so changing `sindar model` never reached existing chats (Telegram kept a retired model). From now
+ * on `sessions.model` is only set by an explicit per-chat pick; clear the historical auto-pins.
+ */
+const v3: Migration = {
+  id: 3,
+  name: 'unpin-auto-session-models',
+  up: (db) => {
+    db.exec(`UPDATE sessions SET model = NULL;`);
+  },
+};
+
+export const MIGRATIONS: Migration[] = [init, v2, v3];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.id ?? 0;
 

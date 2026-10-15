@@ -6,7 +6,8 @@ import type { Db } from '../db/types.js';
 import type { SindarPaths } from '../paths.js';
 import type { PlatformInfo } from '../platform.js';
 import { decide, sessionKey, type PolicyDecision, type PolicyState } from '../policy/index.js';
-import type { ModelTarget, ProviderRegistry } from '../providers/registry.js';
+import { ProviderRegistry, type ModelTarget } from '../providers/registry.js';
+import { setConfigValue } from '../config/edit.js';
 import {
   ProviderError,
   type ChatMessage,
@@ -208,7 +209,6 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
     store.update(session.id, { title });
     session.title = title;
   }
-  if (!session.model) store.update(session.id, { model: target.ref });
   emit({ type: 'turn_start', session, model: target.ref });
 
   const totalUsage: Usage = { inputTokens: 0, outputTokens: 0 };
@@ -364,6 +364,47 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
   const MAX_SHRINKS = 3;
   let shrinks = 0;
 
+  /** Every model that failed this turn (last error per ref) — reported together at the end. */
+  const failures = new Map<string, string>();
+
+  /**
+   * The provider says the model id itself is gone (Gemini "no longer available to new users",
+   * Groq "does not exist"). Confirm against its live list, slot the best surviving sibling in
+   * right after the dead one and persist the swap so the next message does not pay for it again.
+   */
+  const healRetired = async (dead: string): Promise<string | undefined> => {
+    let alt: string | undefined;
+    try {
+      alt = await registry.replacementFor(dead);
+    } catch {
+      return undefined;
+    }
+    if (!alt) return undefined;
+    if (!candidates.includes(alt)) candidates.splice(targetIdx + 1, 0, alt);
+    emit({ type: 'notice', message: t(rt.lang, 'agent.modelRetired', { model: dead, alt }) });
+    const cfg = rt.config.model;
+    try {
+      if (cfg.default === dead) {
+        cfg.default = alt;
+        setConfigValue(rt.paths.config, 'model.default', alt);
+      }
+      const fb = [...new Set(cfg.fallbacks.map((r) => (r === dead ? alt : r)))].filter(
+        (r) => r !== cfg.default,
+      );
+      if (fb.join('\u0000') !== cfg.fallbacks.join('\u0000')) {
+        cfg.fallbacks = fb;
+        setConfigValue(rt.paths.config, 'model.fallbacks', fb);
+      }
+      if (session.model === dead) {
+        session.model = alt;
+        store.update(session.id, { model: alt });
+      }
+    } catch (err) {
+      rt.logger.warn('could not persist model replacement', { error: (err as Error).message });
+    }
+    return alt;
+  };
+
   const switchTarget = (reason: string): boolean => {
     while (++targetIdx < candidates.length) {
       try {
@@ -511,6 +552,8 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           code: (e as ProviderError).code,
           error: e.message,
         });
+        failures.set(target.ref, e.message);
+        if (!streamed && ProviderRegistry.looksRetired(e)) await healRetired(target.ref);
         // A per-minute budget 429 tells us the limit and how full the minute is — remember both so
         // the next calls (and the fallback choice) are paced instead of guessed.
         const minute = minuteInfo(e);
@@ -573,7 +616,7 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           messages = fitRequest(await maybeCompress(assemble()));
           continue;
         }
-        const friendly =
+        let friendly =
           e instanceof ProviderError && e.code === 'too_large'
             ? new ProviderError(
                 `${t(rt.lang, 'agent.tooLarge', { limit: e.limitTokens ?? registry.budget(target.ref).tokens ?? '?' })} (${e.message})`,
@@ -582,6 +625,19 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
                 false,
               )
             : e;
+        // Several models were tried: name each one and why it failed, instead of only the last
+        // (which hides the real cause — e.g. the default's quota error behind a fallback's 404).
+        if (failures.size > 1) {
+          const lines = [...failures].map(
+            ([ref, msg]) => `• ${ref} — ${msg.length > 220 ? `${msg.slice(0, 220)}…` : msg}`,
+          );
+          friendly = new ProviderError(
+            `${t(rt.lang, 'agent.allFailed', { n: failures.size })}\n${lines.join('\n')}`,
+            (friendly as ProviderError).code ?? 'unknown',
+            (friendly as ProviderError).status,
+            false,
+          );
+        }
         emit({ type: 'error', error: friendly });
         if (text) store.append(session.id, { role: 'assistant', content: text });
         throw new AgentError(friendly.message, e);

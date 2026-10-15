@@ -215,7 +215,10 @@ export const en: Record<keyof typeof ar, string> = {
   'model.providers': 'Providers:',
   'model.ready': 'ready',
   'model.nokey': 'no key ({env})',
+  'model.live': 'The running brain picked up the change — the next message uses it',
+  'model.restartHint': 'The brain is running with the old settings — run: sindar gateway restart',
   'model.set': 'Default model set to {model}',
+  'model.warn.badRef': 'Note: "{model}" is not provider:model (e.g. groq:openai/gpt-oss-120b)',
   'model.warn.missing':
     'Note: {provider} does not list {model} (retired?). Closest available: {alt} — full list: sindar model --list {provider}',
   'model.warn.unconfigured': 'Warning: provider {provider} has no key yet — run sindar onboard',
@@ -376,6 +379,9 @@ export const en: Record<keyof typeof ar, string> = {
   'agent.trimmed':
     'The request exceeded the model limit (~{limit} tokens) — trimmed the context and retried.',
   'agent.minuteBusy': 'per-minute budget of {model} is full',
+  'agent.modelRetired':
+    'ℹ️ The provider retired {model} — using {alt} instead (saved to your settings).',
+  'agent.allFailed': 'Tried {n} models, none worked:',
   'agent.minuteWait':
     'free model {model} reached its tokens-per-minute limit — waiting for the window to refill',
   'agent.tooLarge':

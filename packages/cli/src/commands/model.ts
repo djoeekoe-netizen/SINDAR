@@ -8,7 +8,35 @@ import {
   setConfigValue,
   t,
 } from '@sindar/core';
+import { loadOrCreateToken } from '@sindar/gateway';
 import { bootstrap, type App } from '../app.js';
+import { fetchHealth, gatewayUrl } from './gateway.js';
+
+/**
+ * A running brain only reads config.yaml at startup; hand it the change over its API so the next
+ * message uses the new model without `sindar gateway restart`. Says nothing when no brain runs.
+ */
+async function pushToGateway(
+  app: App,
+  body: Record<string, unknown>,
+  out: (s?: string) => void,
+): Promise<void> {
+  const url = gatewayUrl(app);
+  if (!(await fetchHealth(url, 800))) return;
+  try {
+    const token = process.env.SINDAR_GATEWAY_TOKEN ?? loadOrCreateToken(app.paths.home);
+    const res = await fetch(`${url}/api/config`, {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    out(pc.green(t(app.lang, 'model.live')));
+  } catch {
+    out(pc.yellow(t(app.lang, 'model.restartHint')));
+  }
+}
 
 /** Best effort: tell the user when the provider does not list this model (retired / typo). */
 async function warnIfMissing(
@@ -16,16 +44,22 @@ async function warnIfMissing(
   providerId: string,
   ref: string,
   out: (s?: string) => void,
+  lists: Map<string, Promise<Array<{ id: string }>>> = new Map(),
 ): Promise<void> {
   try {
-    const provider = app.registry.get(providerId);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const ids = (await Promise.race([
-      provider.listModels(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('timeout')), 8000);
-      }),
-    ]).finally(() => clearTimeout(timer))) as Array<{ id: string }>;
+    let pending = lists.get(providerId);
+    if (!pending) {
+      const provider = app.registry.get(providerId);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      pending = Promise.race([
+        provider.listModels(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), 8000);
+        }),
+      ]).finally(() => clearTimeout(timer)) as Promise<Array<{ id: string }>>;
+      lists.set(providerId, pending);
+    }
+    const ids = await pending;
     const { model } = app.registry.parse(ref);
     if (ids.length && !ids.some((m) => m.id === model)) {
       const alt = pickAvailableModel(
@@ -75,6 +109,17 @@ export function registerModel(program: Command): void {
                 list: list.join(', ') || t(app.lang, 'model.none'),
               }),
             );
+            await pushToGateway(app, { 'model.fallbacks': list }, out);
+            const lists = new Map<string, Promise<Array<{ id: string }>>>();
+            for (const fb of list) {
+              try {
+                const { provider } = app.registry.parse(fb);
+                if (app.registry.resolve(provider)?.configured)
+                  await warnIfMissing(app, provider, fb, out, lists);
+              } catch {
+                out(pc.yellow(t(app.lang, 'model.warn.badRef', { model: fb })));
+              }
+            }
           }
           if (ref) {
             const { provider } = app.registry.parse(ref);
@@ -82,6 +127,7 @@ export function registerModel(program: Command): void {
             if (!r) throw new Error(`unknown provider "${provider}"`);
             setConfigValue(app.paths.config, 'model.default', ref);
             out(pc.green(t(app.lang, 'model.set', { model: ref })));
+            await pushToGateway(app, { 'model.default': ref }, out);
             if (!r.configured) out(pc.yellow(t(app.lang, 'model.warn.unconfigured', { provider })));
             else await warnIfMissing(app, provider, ref, out);
             return;
