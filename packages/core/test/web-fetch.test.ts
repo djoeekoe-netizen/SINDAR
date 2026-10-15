@@ -54,7 +54,7 @@ describe('web_fetch resilience', () => {
     const notes: string[] = [];
     const { f, calls } = fakeFetch({
       [ARTICLE]: (init) =>
-        /Windows/.test((init?.headers as Record<string, string>)['user-agent'] ?? '')
+        /Windows/.test(((init?.headers ?? {}) as Record<string, string>)['user-agent'] ?? '')
           ? html('Desktop OK', '<p>Served to desktop</p>')
           : new Response('<h1>ACCESS DENIED</h1>', { status: 403, statusText: 'Forbidden' }),
     });
