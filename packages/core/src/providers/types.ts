@@ -72,6 +72,10 @@ export class ProviderError extends Error {
   limitTokens?: number;
   /** For `too_large`: how many tokens the provider counted in our request, when it said so. */
   requestedTokens?: number;
+  /** For `rate_limit`: tokens already consumed in the current window, when the provider said so. */
+  usedTokens?: number;
+  /** For `rate_limit`: the limit is a tokens-per-minute budget (Groq "TPM"), not a request rate. */
+  perMinute?: boolean;
   constructor(
     message: string,
     public readonly code: ProviderErrorCode = 'unknown',

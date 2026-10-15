@@ -16,6 +16,7 @@ import {
   type Usage,
 } from '../providers/types.js';
 import type { Tool, ToolContext, ToolRegistry, ToolResult } from '../tools/types.js';
+import { parseRetryAfter, parseTokenLimits } from '../providers/http.js';
 import { buildSystemPrompt, estimateTokens } from './context.js';
 import { fitToBudget, totalTokens } from './budget.js';
 import { t } from '../i18n/index.js';
@@ -353,6 +354,12 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
 
   const MAX_WAITS = 3;
   const MAX_WAIT_MS = 45_000;
+  /** When the provider says exactly how long (Groq "try again in 49.41s"), waiting beats failing. */
+  const MAX_HINTED_WAIT_MS = 90_000;
+  /** Rough completion size added to the prompt estimate when pacing per-minute budgets. */
+  const OUTPUT_ESTIMATE = 400;
+  /** Below this, waiting for the minute window beats switching models. */
+  const SWITCH_THRESHOLD_MS = 5_000;
   let waits = 0;
   const MAX_SHRINKS = 3;
   let shrinks = 0;
@@ -377,6 +384,21 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
   const MAX_IDENTICAL_CALLS = 2;
   const repeatCounts = new Map<string, number>();
 
+  /** Per-minute budget facts from a 429, whether the provider layer flagged them or only the text says so. */
+  const minuteInfo = (
+    e: Error,
+  ): { limit?: number; used?: number; retryAfterMs?: number } | undefined => {
+    if (!(e instanceof ProviderError) || e.code !== 'rate_limit') return undefined;
+    const perMinute = e.perMinute ?? /per minute|\bTPM\b/i.test(e.message);
+    if (!perMinute) return undefined;
+    const parsed = parseTokenLimits(e.message);
+    return {
+      limit: e.limitTokens ?? parsed.limit,
+      used: e.usedTokens ?? parsed.used,
+      retryAfterMs: e.retryAfterMs ?? parseRetryAfter(null, e.message),
+    };
+  };
+
   // 2) The loop.
   while (iterations < maxIterations) {
     if (signal?.aborted) {
@@ -396,6 +418,42 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
       text = '';
       calls.length = 0;
       streamed = false;
+      // Free tiers meter tokens per minute across requests: if this call would not fit in what is
+      // left of the minute, move to a fallback with room, or wait for the window instead of
+      // burning a request on a certain 429.
+      {
+        const est =
+          Math.round(requestEstimate(messages) * registry.budget(target.ref).scale) +
+          OUTPUT_ESTIMATE;
+        const waitMs = registry.minuteWait(target.ref, est);
+        if (waitMs > 0) {
+          // A short pause is cheaper than changing models mid-task; a long one is not.
+          if (
+            waitMs > SWITCH_THRESHOLD_MS &&
+            switchTarget(t(rt.lang, 'agent.minuteBusy', { model: target.ref }))
+          ) {
+            messages = fitRequest(await maybeCompress(assemble()));
+            continue;
+          }
+          if (waitMs <= MAX_HINTED_WAIT_MS && waits < MAX_WAITS) {
+            if (waitMs >= SWITCH_THRESHOLD_MS) {
+              waits++;
+              emit({
+                type: 'retry_wait',
+                model: target.ref,
+                seconds: Math.ceil(waitMs / 1000),
+                attempt: waits,
+                reason: t(rt.lang, 'agent.minuteWait', { model: target.ref }),
+              });
+            }
+            if (await sleep(waitMs, signal)) {
+              turnFinish = 'cancelled';
+              break;
+            }
+          }
+        }
+      }
+      let usageNoted = false;
       try {
         const req = {
           model: target.model,
@@ -421,10 +479,20 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
               totalUsage.outputTokens += ev.usage.outputTokens;
               store.recordUsage(session.id, target.providerId, target.model, ev.usage);
               registry.calibrate(target.ref, requestEstimate(messages), ev.usage.inputTokens);
+              registry.noteUsage(target.ref, ev.usage.inputTokens + ev.usage.outputTokens);
+              usageNoted = true;
               emit({ type: 'usage', usage: ev.usage, model: target.ref });
               break;
             case 'done':
               turnFinish = ev.finishReason;
+              if (!usageNoted) {
+                registry.noteUsage(
+                  target.ref,
+                  Math.round(requestEstimate(messages) * registry.budget(target.ref).scale) +
+                    approxTokens([{ role: 'assistant', content: text }]),
+                );
+                usageNoted = true;
+              }
               break;
             case 'error':
               throw ev.error;
@@ -443,6 +511,10 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
           code: (e as ProviderError).code,
           error: e.message,
         });
+        // A per-minute budget 429 tells us the limit and how full the minute is — remember both so
+        // the next calls (and the fallback choice) are paced instead of guessed.
+        const minute = minuteInfo(e);
+        if (minute) registry.noteRateLimit(target.ref, minute);
         // The request alone is bigger than the model/tier accepts (Groq 413 "Request too large",
         // context_length_exceeded…): learn the cap, shrink what we send and try again — same model.
         if (
@@ -477,16 +549,20 @@ export async function runTurn(rt: AgentRuntime, opts: TurnOptions): Promise<Turn
         }
         // Nothing left to fall back to: for short rate limits / transient errors, wait and retry.
         if (retryable && !streamed && waits < MAX_WAITS) {
-          const hinted = e instanceof ProviderError ? e.retryAfterMs : undefined;
+          const hinted =
+            e instanceof ProviderError ? (e.retryAfterMs ?? minute?.retryAfterMs) : undefined;
           const base = isNetwork ? 5000 : 2000;
-          const ms = Math.min(MAX_WAIT_MS, hinted !== undefined ? hinted + 500 : base * 2 ** waits);
+          const ms =
+            hinted !== undefined
+              ? Math.min(MAX_HINTED_WAIT_MS, hinted + 500)
+              : Math.min(MAX_WAIT_MS, base * 2 ** waits);
           waits++;
           emit({
             type: 'retry_wait',
             model: target.ref,
             seconds: Math.ceil(ms / 1000),
             attempt: waits,
-            reason: e.message,
+            reason: minute ? t(rt.lang, 'agent.minuteWait', { model: target.ref }) : e.message,
           });
           const aborted = await sleep(ms, signal);
           if (!aborted) continue;

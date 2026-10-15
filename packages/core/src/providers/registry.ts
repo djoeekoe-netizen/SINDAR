@@ -73,6 +73,8 @@ const INPUT_BUDGETS: Array<[provider: RegExp, model: RegExp, tokens: number]> = 
   [/^groq$/i, /.*/, 8_000],
 ];
 
+const MINUTE_MS = 60_000;
+
 export function guessInputBudget(providerId: string, model: string): number | undefined {
   for (const [p, m, n] of INPUT_BUDGETS) if (p.test(providerId) && m.test(model)) return n;
   return undefined;
@@ -183,6 +185,69 @@ export class ProviderRegistry {
 
   private readonly learnedBudgets = new Map<string, number>();
   private readonly scales = new Map<string, number>();
+  private readonly minuteLimits = new Map<string, number>();
+  private readonly minuteLog = new Map<string, Array<{ at: number; tokens: number }>>();
+
+  /**
+   * Tokens-per-minute budget of `provider:model`: learned from a 429 that quoted it, else the
+   * free-tier table (on Groq the per-request cap *is* the TPM). Undefined = no known minute cap.
+   */
+  minuteLimit(ref: string): number | undefined {
+    const learned = this.minuteLimits.get(ref);
+    if (learned !== undefined) return learned;
+    const { provider: providerId = '', model } = parseModelRef(ref);
+    return guessInputBudget(providerId, model);
+  }
+
+  private window(ref: string, now: number): Array<{ at: number; tokens: number }> {
+    const list = (this.minuteLog.get(ref) ?? []).filter((e) => now - e.at < MINUTE_MS);
+    this.minuteLog.set(ref, list);
+    return list;
+  }
+
+  /** Record tokens a request consumed (prompt + completion) so the next one can be paced. */
+  noteUsage(ref: string, tokens: number, now: number = Date.now()): void {
+    if (!(tokens > 0)) return;
+    this.window(ref, now).push({ at: now, tokens });
+  }
+
+  /** Tokens counted against `ref` in the current minute. */
+  minuteUsed(ref: string, now: number = Date.now()): number {
+    return this.window(ref, now).reduce((sum, e) => sum + e.tokens, 0);
+  }
+
+  /**
+   * A per-minute 429: trust the provider's numbers — remember the limit and align our window so
+   * that `used` tokens expire exactly when it says we may retry.
+   */
+  noteRateLimit(
+    ref: string,
+    info: { limit?: number; used?: number; retryAfterMs?: number },
+    now: number = Date.now(),
+  ): void {
+    if (info.limit && info.limit > 0) this.minuteLimits.set(ref, info.limit);
+    if (info.used !== undefined && info.used > 0) {
+      const expiresIn = Math.min(MINUTE_MS, Math.max(1000, info.retryAfterMs ?? MINUTE_MS));
+      this.minuteLog.set(ref, [{ at: now - (MINUTE_MS - expiresIn), tokens: info.used }]);
+    }
+  }
+
+  /**
+   * Milliseconds to wait before a request of `tokens` fits in this minute's budget (0 = now).
+   * A request that could never fit returns 0 — that is the per-request cap's business.
+   */
+  minuteWait(ref: string, tokens: number, now: number = Date.now()): number {
+    const limit = this.minuteLimit(ref);
+    if (!limit || tokens >= limit) return 0;
+    const list = this.window(ref, now);
+    let used = list.reduce((sum, e) => sum + e.tokens, 0);
+    if (used + tokens <= limit) return 0;
+    for (const e of list) {
+      used -= e.tokens;
+      if (used + tokens <= limit) return Math.max(0, e.at + MINUTE_MS - now) + 250;
+    }
+    return MINUTE_MS;
+  }
 
   /** Per-request cap for `provider:model` (config override > learned from errors > known free tiers). */
   budget(ref: string): RequestBudget {

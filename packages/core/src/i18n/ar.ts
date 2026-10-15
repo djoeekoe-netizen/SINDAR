@@ -295,6 +295,8 @@ export const ar = {
   'tg.text_only': 'حالياً أفهم النصوص فقط — الصور والصوت تأتي في مرحلة لاحقة.',
   'tg.working': '⏳ …',
   'tg.tool': '⚙️ {summary}',
+  'tg.waiting': '⏳ النموذج المجاني وصل حدّ الدقيقة — أنتظر {seconds} ثانية ثم أكمل…',
+  'tg.switched': '🔁 أكمل بالنموذج {model} لأن الأول مشغول…',
   'tg.approval': '🔐 أحتاج إذنك:\n{summary}\n\n{args}',
   'tg.approval.allow': '✅ موافق',
   'tg.approval.always': '✅ دائماً',
@@ -365,6 +367,9 @@ export const ar = {
   'app.unknown': 'أمر غير معروف: {action} — المتاح: connect | link | install',
   // ---- agent loop (request budget) ----
   'agent.trimmed': 'الطلب كان أكبر من حد النموذج (~{limit} توكن) — اختصرتُ السياق وأعدتُ المحاولة.',
+  'agent.minuteBusy': 'حدّ الدقيقة للنموذج {model} ممتلئ',
+  'agent.minuteWait':
+    'النموذج المجاني {model} وصل حدّ التوكنات في الدقيقة — أنتظر حتى يتجدد ثم أكمل',
   'agent.tooLarge':
     'الطلب أكبر من حد النموذج المجاني (~{limit} توكن) حتى بعد الاختصار. جرّب رسالة أقصر، أو ابدأ محادثة جديدة، أو اختر نموذجاً بحدّ أكبر من ☰ ← النموذج.',
   'common.yes': 'نعم',

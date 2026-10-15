@@ -299,6 +299,8 @@ export const en: Record<keyof typeof ar, string> = {
   'tg.text_only': 'I only understand text for now — photos and voice come in a later milestone.',
   'tg.working': '⏳ …',
   'tg.tool': '⚙️ {summary}',
+  'tg.waiting': '⏳ The free model hit its per-minute limit — waiting {seconds}s, then continuing…',
+  'tg.switched': '🔁 Continuing with {model} because the first model is busy…',
   'tg.approval': '🔐 I need your approval:\n{summary}\n\n{args}',
   'tg.approval.allow': '✅ Allow',
   'tg.approval.always': '✅ Always',
@@ -370,6 +372,9 @@ export const en: Record<keyof typeof ar, string> = {
   // ---- agent loop (request budget) ----
   'agent.trimmed':
     'The request exceeded the model limit (~{limit} tokens) — trimmed the context and retried.',
+  'agent.minuteBusy': 'per-minute budget of {model} is full',
+  'agent.minuteWait':
+    'free model {model} reached its tokens-per-minute limit — waiting for the window to refill',
   'agent.tooLarge':
     'The request is bigger than this free model allows (~{limit} tokens) even after trimming. Try a shorter message, start a new chat, or pick a model with a higher limit from ☰ → Model.',
   'common.yes': 'yes',

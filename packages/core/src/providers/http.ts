@@ -43,7 +43,11 @@ export function isTooLargeMessage(text: string): boolean {
 }
 
 /** Pull "Limit N" / "Requested N" style numbers (tokens) out of a too-large error text. */
-export function parseTokenLimits(text: string): { limit?: number; requested?: number } {
+export function parseTokenLimits(text: string): {
+  limit?: number;
+  requested?: number;
+  used?: number;
+} {
   const num = (re: RegExp) => {
     const m = re.exec(text);
     return m ? Number.parseInt(m[1]!.replace(/[,_]/g, ''), 10) : undefined;
@@ -58,9 +62,11 @@ export function parseTokenLimits(text: string): { limit?: number; requested?: nu
     num(/you requested\s*([\d,_]+)/i) ??
     num(/(?:prompt|input|messages?) (?:is|are|resulted in)\s*([\d,_]+)\s*tokens/i) ??
     num(/([\d,_]+)\s*tokens\s*>/i);
+  const used = num(/\bused:?\s*([\d,_]+)/i);
   return {
     limit: limit && Number.isFinite(limit) ? limit : undefined,
     requested: requested && Number.isFinite(requested) ? requested : undefined,
+    used: used && Number.isFinite(used) ? used : undefined,
   };
 }
 
@@ -85,6 +91,15 @@ export async function httpError(res: Response, provider: string): Promise<Provid
     const { limit, requested } = parseTokenLimits(text);
     err.limitTokens = limit;
     err.requestedTokens = requested;
+  } else if (res.status === 429) {
+    // Groq: "Rate limit reached … tokens per minute (TPM): Limit 8000, Used 6895, Requested 7693"
+    const { limit, requested, used } = parseTokenLimits(text);
+    err.perMinute = /per minute|\bTPM\b/i.test(text);
+    if (err.perMinute) {
+      err.limitTokens = limit;
+      err.requestedTokens = requested;
+      err.usedTokens = used;
+    }
   }
   const wait = parseRetryAfter(res.headers.get('retry-after'), text);
   if (wait !== undefined) err.retryAfterMs = wait;

@@ -54,6 +54,8 @@ interface ActiveTurn {
   chatId: number;
   text: string;
   toolLine?: string;
+  /** Transient status (waiting for a rate limit, model switched…) shown until text arrives. */
+  statusLine?: string;
   messageId?: number;
   shown: string;
   lastEditAt: number;
@@ -452,12 +454,24 @@ export class TelegramChannel {
         const ev = m.event;
         if (ev.type === 'text') {
           turn.text += ev.delta;
+          turn.statusLine = undefined;
           this.scheduleFlush(turn);
         } else if (ev.type === 'tool_start') {
           turn.toolLine = ev.summary;
+          turn.statusLine = undefined;
           this.scheduleFlush(turn);
         } else if (ev.type === 'tool_end') {
           if (ev.files?.length) turn.files.push(...ev.files);
+        } else if (ev.type === 'retry_wait') {
+          // Free-tier pauses can last a minute: say so instead of looking frozen.
+          turn.statusLine = this.tr('tg.waiting', { seconds: ev.seconds });
+          this.scheduleFlush(turn);
+        } else if (ev.type === 'model_switch') {
+          turn.statusLine = this.tr('tg.switched', { model: ev.to });
+          this.scheduleFlush(turn);
+        } else if (ev.type === 'notice') {
+          turn.statusLine = ev.message;
+          this.scheduleFlush(turn);
         }
         return;
       }
@@ -503,7 +517,8 @@ export class TelegramChannel {
         turn.text.length > STREAM_PREVIEW_CHARS
           ? `${turn.text.slice(0, STREAM_PREVIEW_CHARS)}…`
           : `${turn.text} ▍`;
-    } else if (turn.toolLine) display = this.tr('tg.tool', { summary: turn.toolLine });
+    } else if (turn.statusLine) display = turn.statusLine;
+    else if (turn.toolLine) display = this.tr('tg.tool', { summary: turn.toolLine });
     else display = this.tr('tg.working');
     if (display === turn.shown) return;
     turn.lastEditAt = Date.now();
